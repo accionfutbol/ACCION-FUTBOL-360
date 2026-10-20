@@ -12,13 +12,15 @@ import {
   LogOut,
   Menu,
   X,
+  FileText,
 } from "lucide-react";
 import { useState } from "react";
 import type { UserRole } from "@/lib/types";
 
 const entrenadorLinks = [
   { href: "/entrenador/asistencia", label: "Asistencia", icon: ClipboardList },
-  { href: "/entrenador/reporte", label: "Reportes", icon: BarChart3 },
+  { href: "/entrenador/reporte-entrenamiento", label: "Reporte DT", icon: FileText },
+  { href: "/entrenador/reporte", label: "Reportes General", icon: BarChart3 },
   { href: "/entrenador/jugadores", label: "Jugadores", icon: Users },
 ];
 
