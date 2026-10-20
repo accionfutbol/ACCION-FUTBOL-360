@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -43,7 +44,13 @@ export function Navbar({ role, nombre }: { role: UserRole; nombre: string }) {
     <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
         <Link href="/" className="flex items-center gap-2">
-          <span className="text-lg font-bold text-primary">AF</span>
+          <Image
+            src="/logo-af.jpg"
+            alt="Acción Fútbol"
+            width={32}
+            height={32}
+            className="rounded"
+          />
           <span className="hidden text-sm font-medium sm:inline">
             Acción Fútbol
           </span>
