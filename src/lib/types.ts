@@ -18,6 +18,8 @@ export type TipoObservacion =
   | "LESION"
   | "OTRO";
 
+export type EstadoMes = "SEGURO" | "INSEGURO" | "OUT";
+
 export type UserRole = "entrenador" | "apoderado" | "admin";
 
 export interface Database {
@@ -53,6 +55,8 @@ export interface Database {
           nombre: string;
           fecha_nacimiento: string | null;
           estado: EstadoJugador;
+          estado_mes: EstadoMes | null;
+          tipo: string | null;
           sede_id: string;
           categoria_id: string;
           nivel: string | null;
@@ -66,6 +70,30 @@ export interface Database {
           foto_url: string | null;
           fecha_ingreso: string | null;
           fecha_salida: string | null;
+          anio_nacimiento: number | null;
+          sexo: string | null;
+          nacionalidad: string | null;
+          comuna: string | null;
+          direccion: string | null;
+          colegio: string | null;
+          comuna_colegio: string | null;
+          talla_ropa: string | null;
+          nombre_camiseta: string | null;
+          numero_camiseta: string | null;
+          antecedentes_deportivos: string | null;
+          como_llego: string | null;
+          objetivo: string | null;
+          centro_salud_emergencia: string | null;
+          situacion_pagos: string | null;
+          grupo_whatsapp: string | null;
+          nombre_apoderado: string | null;
+          email_apoderado: string | null;
+          rut_apoderado: string | null;
+          profesion_apoderado: string | null;
+          comuna_apoderado: string | null;
+          uniforme_negro: string | null;
+          uniforme_rosado: string | null;
+          poleron: string | null;
           created_at: string;
           updated_at: string;
         };

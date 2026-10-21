@@ -13,6 +13,7 @@ import {
   Menu,
   X,
   FileText,
+  Star,
 } from "lucide-react";
 import { useState } from "react";
 import type { UserRole } from "@/lib/types";
@@ -21,7 +22,8 @@ const entrenadorLinks = [
   { href: "/entrenador/asistencia", label: "Asistencia", icon: ClipboardList },
   { href: "/entrenador/reporte-entrenamiento", label: "Reporte DT", icon: FileText },
   { href: "/entrenador/reporte", label: "Reportes General", icon: BarChart3 },
-  { href: "/entrenador/jugadores", label: "Jugadores", icon: Users },
+  { href: "/entrenador/evaluaciones", label: "Evaluaciones", icon: Star },
+  { href: "/entrenador/jugadores", label: "Data Jugadores", icon: Users },
 ];
 
 const apoderadoLinks = [
