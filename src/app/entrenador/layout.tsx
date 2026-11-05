@@ -25,9 +25,11 @@ export default async function EntrenadorLayout({
   }
 
   return (
-    <>
+    <div className="flex min-h-full">
       <Navbar role={profile.role} nombre={profile.nombre} />
-      <main className="mx-auto w-full max-w-5xl flex-1 p-4">{children}</main>
-    </>
+      <main className="flex-1 md:ml-56">
+        <div className="mx-auto w-full max-w-5xl p-4">{children}</div>
+      </main>
+    </div>
   );
 }

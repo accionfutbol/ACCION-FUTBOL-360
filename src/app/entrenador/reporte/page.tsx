@@ -447,7 +447,7 @@ export default function ReportePage() {
                           borderRadius: 8,
                           fontSize: 12,
                         }}
-                        formatter={(v: number) => [`${v}%`, "Asistencia"]}
+                        formatter={(v: unknown) => [`${v}%`, "Asistencia"]}
                       />
                       <Bar dataKey="porcentaje" radius={[0, 4, 4, 0]}>
                         {barData.map((entry, i) => (

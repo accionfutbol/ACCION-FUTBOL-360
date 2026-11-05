@@ -22,6 +22,10 @@ export type EstadoMes = "SEGURO" | "INSEGURO" | "OUT";
 
 export type UserRole = "entrenador" | "apoderado" | "admin";
 
+export type EstadoConvocatoria = "TITULAR" | "SUPLENTE" | "INGRESO" | "NO_CITADO";
+
+export type EstadoPago = "PAGADO" | "PENDIENTE" | "ATRASADO" | "BECADO" | "CONGELADO";
+
 export interface Database {
   public: {
     Tables: {
@@ -85,6 +89,8 @@ export interface Database {
           objetivo: string | null;
           centro_salud_emergencia: string | null;
           situacion_pagos: string | null;
+          pago_mensual: string | null;
+          numero_morosidad: number | null;
           grupo_whatsapp: string | null;
           nombre_apoderado: string | null;
           email_apoderado: string | null;
@@ -235,6 +241,99 @@ export interface Database {
         Insert: Omit<Database["public"]["Tables"]["profiles"]["Row"], "created_at">;
         Update: Partial<Database["public"]["Tables"]["profiles"]["Insert"]>;
       };
+      partidos: {
+        Row: {
+          id: string;
+          fecha: string;
+          categoria_id: string;
+          sede_id: string;
+          rival: string;
+          torneo: string | null;
+          resultado: string | null;
+          marcador_favor: number;
+          marcador_contra: number;
+          entrenador_id: string | null;
+          link_video: string | null;
+          observacion: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["partidos"]["Row"], "id" | "created_at" | "updated_at">;
+        Update: Partial<Database["public"]["Tables"]["partidos"]["Insert"]>;
+      };
+      partido_jugador: {
+        Row: {
+          id: string;
+          partido_id: string;
+          jugador_id: string;
+          estado: EstadoConvocatoria;
+          minutos: number;
+          posicion: string | null;
+          goles: number;
+          asistencias_gol: number;
+          tarj_amarilla: number;
+          tarj_roja: number;
+          nota: number | null;
+          observacion: string | null;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["partido_jugador"]["Row"], "id" | "created_at">;
+        Update: Partial<Database["public"]["Tables"]["partido_jugador"]["Insert"]>;
+      };
+      eval_fisicas: {
+        Row: {
+          id: string;
+          jugador_id: string;
+          fecha: string;
+          salto: number | null;
+          velocidad_30m: number | null;
+          ift: number | null;
+          altura: number | null;
+          peso: number | null;
+          imc: number | null;
+          grasa_corporal: number | null;
+          masa_muscular: number | null;
+          flexibilidad: number | null;
+          resistencia: string | null;
+          observacion: string | null;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["eval_fisicas"]["Row"], "id" | "created_at">;
+        Update: Partial<Database["public"]["Tables"]["eval_fisicas"]["Insert"]>;
+      };
+      mensualidades: {
+        Row: {
+          id: string;
+          jugador_id: string;
+          mes: string;
+          monto: number | null;
+          estado: EstadoPago;
+          fecha_pago: string | null;
+          metodo_pago: string | null;
+          comprobante_url: string | null;
+          registrado_por: string | null;
+          observacion: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["mensualidades"]["Row"], "id" | "created_at" | "updated_at">;
+        Update: Partial<Database["public"]["Tables"]["mensualidades"]["Insert"]>;
+      };
+      comunicaciones: {
+        Row: {
+          id: string;
+          titulo: string;
+          contenido: string;
+          tipo: string;
+          autor_id: string | null;
+          sede_id: string | null;
+          categoria_id: string | null;
+          para_todos: boolean;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["comunicaciones"]["Row"], "id" | "created_at">;
+        Update: Partial<Database["public"]["Tables"]["comunicaciones"]["Insert"]>;
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -245,6 +344,8 @@ export interface Database {
       tipo_categoria: TipoCategoria;
       tipo_observacion: TipoObservacion;
       user_role: UserRole;
+      estado_convocatoria: EstadoConvocatoria;
+      estado_pago: EstadoPago;
     };
   };
 }

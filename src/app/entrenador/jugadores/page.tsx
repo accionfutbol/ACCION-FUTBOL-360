@@ -29,8 +29,11 @@ import {
   Heart,
   X,
   CheckCircle2,
+  DollarSign,
+  Upload,
 } from "lucide-react";
 import type { EstadoJugador, EstadoMes } from "@/lib/types";
+import { CargaMasiva } from "@/components/jugadores/carga-masiva";
 
 interface Sede {
   id: string;
@@ -79,6 +82,8 @@ interface Jugador {
   objetivo: string | null;
   centro_salud_emergencia: string | null;
   situacion_pagos: string | null;
+  pago_mensual: string | null;
+  numero_morosidad: number | null;
   grupo_whatsapp: string | null;
   nombre_apoderado: string | null;
   email_apoderado: string | null;
@@ -148,6 +153,7 @@ export default function JugadoresPage() {
   const [selected, setSelected] = useState<Jugador | null>(null);
   const [form, setForm] = useState<Partial<Jugador>>(emptyJugador());
   const [asistenciaStats, setAsistenciaStats] = useState<Record<string, { ok: number; total: number }>>({});
+  const [showCargaMasiva, setShowCargaMasiva] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -293,11 +299,14 @@ export default function JugadoresPage() {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold">Data Jugadores</h1>
-          {isAdmin && (
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={() => setShowCargaMasiva(true)} className="gap-1">
+              <Upload className="h-4 w-4" /> CSV
+            </Button>
             <Button size="sm" onClick={openNuevo} className="gap-1">
               <Plus className="h-4 w-4" /> Nuevo
             </Button>
-          )}
+          </div>
         </div>
 
         <div className="relative">
@@ -408,7 +417,7 @@ export default function JugadoresPage() {
                         <span className="truncate">{j.email_apoderado}</span>
                       </div>
                     )}
-                    <div className="col-span-2 flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5">
                       <CheckCircle2 className="h-3 w-3 shrink-0 text-emerald-400" />
                       {pct !== null ? (
                         <span className={pct >= 75 ? "text-emerald-400" : pct >= 50 ? "text-yellow-400" : "text-red-400"}>
@@ -418,11 +427,37 @@ export default function JugadoresPage() {
                         <span className="text-muted-foreground">Sin registros</span>
                       )}
                     </div>
+                    <div className="flex items-center gap-1.5">
+                      <DollarSign className="h-3 w-3 shrink-0" />
+                      {j.pago_mensual ? (
+                        <span className={
+                          j.pago_mensual.toUpperCase().includes("MOROS")
+                            ? "text-red-400"
+                            : j.pago_mensual.toUpperCase().includes("DI") || j.pago_mensual.toUpperCase().includes("DÍ")
+                            ? "text-emerald-400"
+                            : "text-muted-foreground"
+                        }>
+                          {j.pago_mensual}
+                          {j.numero_morosidad && j.numero_morosidad > 0 ? ` (${j.numero_morosidad} mes${j.numero_morosidad > 1 ? "es" : ""})` : ""}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">Sin info pago</span>
+                      )}
+                    </div>
                   </div>
                 </button>
               );
             })}
           </div>
+        )}
+
+        {showCargaMasiva && (
+          <CargaMasiva
+            sedes={sedes}
+            categorias={categorias}
+            onDone={loadData}
+            onClose={() => setShowCargaMasiva(false)}
+          />
         )}
       </div>
     );
@@ -646,12 +681,17 @@ export default function JugadoresPage() {
       </Section>
 
       {/* Sección: Emergencia */}
+      <Section icon={DollarSign} title="Pagos">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Pago Mensual" value={form.pago_mensual} onChange={(v) => updateForm("pago_mensual", v)} placeholder="AL DIA / MOROSO" />
+          <Field label="Nº Morosidad (meses)" value={form.numero_morosidad != null ? String(form.numero_morosidad) : ""} onChange={(v) => updateForm("numero_morosidad", v ? Number(v) : null)} placeholder="0" type="number" />
+        </div>
+        <Field label="Situación de Pagos (detalle)" value={form.situacion_pagos} onChange={(v) => updateForm("situacion_pagos", v)} placeholder="Observaciones..." />
+      </Section>
+
       <Section icon={Heart} title="Emergencia y Otros">
         <Field label="Centro de Salud Emergencia" value={form.centro_salud_emergencia} onChange={(v) => updateForm("centro_salud_emergencia", v)} />
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Situación de Pagos" value={form.situacion_pagos} onChange={(v) => updateForm("situacion_pagos", v)} placeholder="AL DIA / MOROSO" />
-          <Field label="Grupo WhatsApp" value={form.grupo_whatsapp} onChange={(v) => updateForm("grupo_whatsapp", v)} />
-        </div>
+        <Field label="Grupo WhatsApp" value={form.grupo_whatsapp} onChange={(v) => updateForm("grupo_whatsapp", v)} />
       </Section>
 
       {/* Guardar */}
