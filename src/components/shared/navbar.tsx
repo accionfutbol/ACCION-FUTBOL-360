@@ -22,6 +22,10 @@ import {
   Home,
   Megaphone,
   Shield,
+  MapPin,
+  UserCog,
+  Send,
+  UserPlus,
 } from "lucide-react";
 import { useState } from "react";
 import type { UserRole } from "@/lib/types";
@@ -41,6 +45,10 @@ const entrenadorLinks = [
 
 const adminLinks = [
   { href: "/admin", label: "Admin", icon: Shield },
+  { href: "/admin/pagos", label: "Pagos", icon: DollarSign },
+  { href: "/admin/sedes", label: "Sedes", icon: MapPin },
+  { href: "/admin/usuarios", label: "Usuarios", icon: UserCog },
+  { href: "/admin/inscripciones", label: "Inscripciones", icon: UserPlus },
   { href: "/entrenador/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/entrenador/asistencia", label: "Asistencia", icon: ClipboardList },
   { href: "/entrenador/reporte", label: "Reportes", icon: BarChart3 },
@@ -49,15 +57,16 @@ const adminLinks = [
   { href: "/entrenador/eval-fisicas", label: "Eval. Físicas", icon: Activity },
   { href: "/entrenador/jugadores", label: "Data Jugadores", icon: Users },
   { href: "/entrenador/comunicaciones", label: "Avisos", icon: Megaphone },
-  { href: "/admin/pagos", label: "Pagos", icon: DollarSign },
 ];
 
 const apoderadoLinks = [
   { href: "/apoderado", label: "Inicio", icon: Home },
   { href: "/apoderado/asistencia", label: "Asistencia", icon: ClipboardList },
+  { href: "/apoderado/planificacion", label: "Planificación", icon: CalendarDays },
   { href: "/apoderado/partidos", label: "Partidos", icon: Trophy },
   { href: "/apoderado/evaluaciones", label: "Evaluaciones", icon: Activity },
   { href: "/apoderado/pagos", label: "Pagos", icon: DollarSign },
+  { href: "/apoderado/justificar", label: "Justificar", icon: Send },
 ];
 
 export function Sidebar({ role, nombre }: { role: UserRole; nombre: string }) {

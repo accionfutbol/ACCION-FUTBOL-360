@@ -334,6 +334,56 @@ export interface Database {
         Insert: Omit<Database["public"]["Tables"]["comunicaciones"]["Row"], "id" | "created_at">;
         Update: Partial<Database["public"]["Tables"]["comunicaciones"]["Insert"]>;
       };
+      inscripciones: {
+        Row: {
+          id: string;
+          nombre_jugador: string;
+          rut_jugador: string | null;
+          fecha_nacimiento: string | null;
+          sexo: string | null;
+          sede_id: string | null;
+          categoria_preferida: string | null;
+          nombre_apoderado: string;
+          email_apoderado: string;
+          telefono_apoderado: string;
+          rut_apoderado: string | null;
+          comuna: string | null;
+          como_llego: string | null;
+          antecedentes_deportivos: string | null;
+          observaciones: string | null;
+          estado: string;
+          revisado_por: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["inscripciones"]["Row"], "id" | "created_at" | "updated_at">;
+        Update: Partial<Database["public"]["Tables"]["inscripciones"]["Insert"]>;
+      };
+      planificacion: {
+        Row: {
+          id: string;
+          sede_id: string;
+          categoria_id: string;
+          fecha: string;
+          contenido: string;
+          tipo: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["planificacion"]["Row"], "id" | "created_at" | "updated_at">;
+        Update: Partial<Database["public"]["Tables"]["planificacion"]["Insert"]>;
+      };
+      dias_entrenamiento: {
+        Row: {
+          id: string;
+          sede_id: string;
+          categoria_id: string;
+          dia_semana: number;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["dias_entrenamiento"]["Row"], "id" | "created_at">;
+        Update: Partial<Database["public"]["Tables"]["dias_entrenamiento"]["Insert"]>;
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

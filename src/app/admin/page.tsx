@@ -11,6 +11,9 @@ import {
   AlertCircle,
   Trophy,
   ChevronRight,
+  MapPin,
+  UserCog,
+  UserPlus,
 } from "lucide-react";
 
 interface Stats {
@@ -133,6 +136,63 @@ export default function AdminDashboard() {
             <CardContent>
               <p className="text-sm text-muted-foreground">
                 Buscar jugadores, ver fichas completas, estados
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/admin/sedes">
+          <Card className="group cursor-pointer transition-colors hover:border-primary/50">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-primary" />
+                  <CardTitle className="text-sm">Sedes y Categorías</CardTitle>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Administrar sedes, categorías, tipo competitivo/recreativo
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/admin/usuarios">
+          <Card className="group cursor-pointer transition-colors hover:border-primary/50">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <UserCog className="h-4 w-4 text-primary" />
+                  <CardTitle className="text-sm">Gestión de Usuarios</CardTitle>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Perfiles, entrenadores, apoderados, roles
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/admin/inscripciones">
+          <Card className="group cursor-pointer transition-colors hover:border-primary/50">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <UserPlus className="h-4 w-4 text-primary" />
+                  <CardTitle className="text-sm">Inscripciones Online</CardTitle>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Revisar inscripciones pendientes, aprobar o rechazar
               </p>
             </CardContent>
           </Card>
