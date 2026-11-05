@@ -33,7 +33,20 @@ import {
   Plus,
   Search,
   Activity,
+  TrendingUp,
+  TrendingDown,
+  Minus,
 } from "lucide-react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from "recharts";
 
 interface Sede { id: string; nombre: string }
 interface Categoria { id: string; nombre: string; sede_id: string }
@@ -286,6 +299,99 @@ export default function EvalFisicasPage() {
                 </CardContent>
               </Card>
             )}
+
+            {/* Comparison & trend chart */}
+            {evals.length >= 2 && (() => {
+              const last = evals[0];
+              const prev = evals[1];
+
+              function delta(cur: number | null, old: number | null, invert = false) {
+                if (cur === null || old === null) return null;
+                const d = cur - old;
+                if (d === 0) return { val: 0, icon: Minus, color: "text-muted-foreground" };
+                const improved = invert ? d < 0 : d > 0;
+                return {
+                  val: Math.round(d * 100) / 100,
+                  icon: improved ? TrendingUp : TrendingDown,
+                  color: improved ? "text-emerald-400" : "text-red-400",
+                };
+              }
+
+              const metrics = [
+                { label: "Altura", d: delta(last.altura, prev.altura), unit: "cm" },
+                { label: "Peso", d: delta(last.peso, prev.peso), unit: "kg" },
+                { label: "30m", d: delta(last.velocidad_30m, prev.velocidad_30m, true), unit: "s" },
+                { label: "Salto", d: delta(last.salto, prev.salto), unit: "cm" },
+                { label: "IFT", d: delta(last.ift, prev.ift), unit: "" },
+                { label: "Flex", d: delta(last.flexibilidad, prev.flexibilidad), unit: "cm" },
+              ].filter((m) => m.d !== null);
+
+              const chartData = [...evals].reverse().map((ev) => ({
+                fecha: ev.fecha.slice(5),
+                Salto: ev.salto,
+                "30m": ev.velocidad_30m,
+                Peso: ev.peso,
+              }));
+
+              return (
+                <>
+                  {metrics.length > 0 && (
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-xs">
+                          Cambios vs evaluación anterior ({prev.fecha})
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-3 gap-2">
+                          {metrics.map((m) => {
+                            const Icon = m.d!.icon;
+                            return (
+                              <div key={m.label} className="flex items-center gap-1.5 text-xs">
+                                <Icon className={`h-3.5 w-3.5 ${m.d!.color}`} />
+                                <span className="text-muted-foreground">{m.label}:</span>
+                                <span className={`font-semibold ${m.d!.color}`}>
+                                  {m.d!.val > 0 ? "+" : ""}{m.d!.val}{m.unit}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {evals.length >= 3 && (
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-xs">Progresión</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={180}>
+                          <LineChart data={chartData} margin={{ left: -10, right: 8 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                            <XAxis dataKey="fecha" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+                            <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+                            <Tooltip
+                              contentStyle={{
+                                background: "hsl(var(--card))",
+                                border: "1px solid hsl(var(--border))",
+                                borderRadius: 8,
+                                fontSize: 11,
+                              }}
+                            />
+                            <Legend wrapperStyle={{ fontSize: 10 }} />
+                            <Line type="monotone" dataKey="Salto" stroke="#ff2e93" strokeWidth={2} dot={{ r: 2 }} />
+                            <Line type="monotone" dataKey="30m" stroke="#10b981" strokeWidth={2} dot={{ r: 2 }} />
+                            <Line type="monotone" dataKey="Peso" stroke="#3b82f6" strokeWidth={2} dot={{ r: 2 }} />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+                  )}
+                </>
+              );
+            })()}
           </div>
         )}
       </div>
