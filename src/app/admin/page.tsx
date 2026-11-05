@@ -21,6 +21,7 @@ import {
   UserCheck,
   UserX,
   Clock,
+  FileSpreadsheet,
 } from "lucide-react";
 import {
   BarChart,
@@ -419,6 +420,7 @@ export default function AdminDashboard() {
           <QuickLink href="/admin/sedes" icon={MapPin} title="Sedes y Categorías" desc="Administrar sedes" />
           <QuickLink href="/admin/usuarios" icon={UserCog} title="Usuarios" desc="Perfiles, roles" />
           <QuickLink href="/admin/inscripciones" icon={UserPlus} title="Inscripciones" desc="Revisar pendientes" />
+          <QuickLink href="/admin/reportes" icon={FileSpreadsheet} title="Reportes" desc="Exportar datos CSV" />
           <QuickLink href="/entrenador/dashboard" icon={Activity} title="Dashboard DT" desc="Vista entrenador" />
         </div>
       </div>

@@ -28,6 +28,7 @@ import {
   UserPlus,
   IdCard,
   AlertTriangle,
+  FileSpreadsheet,
 } from "lucide-react";
 import { useState } from "react";
 import type { UserRole } from "@/lib/types";
@@ -53,6 +54,7 @@ const adminLinks = [
   { href: "/admin/sedes", label: "Sedes", icon: MapPin },
   { href: "/admin/usuarios", label: "Usuarios", icon: UserCog },
   { href: "/admin/inscripciones", label: "Inscripciones", icon: UserPlus },
+  { href: "/admin/reportes", label: "Reportes", icon: FileSpreadsheet },
   { href: "/entrenador/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/entrenador/asistencia", label: "Asistencia", icon: ClipboardList },
   { href: "/entrenador/reporte", label: "Reportes", icon: BarChart3 },
