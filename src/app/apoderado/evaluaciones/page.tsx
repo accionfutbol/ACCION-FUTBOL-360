@@ -13,6 +13,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Loader2, Activity, Ruler, Weight, Zap, Timer } from "lucide-react";
+import {
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar,
+  ResponsiveContainer,
+  Tooltip,
+} from "recharts";
 
 interface EvalFisica {
   id: string;
@@ -158,6 +167,63 @@ export default function ApoderadoEvaluacionesPage() {
                       </CardContent>
                     </Card>
                   </div>
+                );
+              })()}
+
+              {/* Radar chart */}
+              {(() => {
+                const last = hijo.evaluaciones[0];
+                const radarData = [
+                  { metric: "Velocidad", value: last.velocidad_30m ? Math.max(0, 100 - (last.velocidad_30m - 3.5) * 20) : 0 },
+                  { metric: "Salto", value: last.salto ? Math.min(100, (last.salto / 60) * 100) : 0 },
+                  { metric: "IFT", value: last.ift ? Math.min(100, (last.ift / 20) * 100) : 0 },
+                  { metric: "Flexibilidad", value: last.flexibilidad ? Math.min(100, (last.flexibilidad / 50) * 100) : 0 },
+                  { metric: "IMC", value: last.imc ? Math.max(0, 100 - Math.abs(last.imc - 20) * 5) : 0 },
+                  { metric: "M. Muscular", value: last.masa_muscular ? Math.min(100, (last.masa_muscular / 60) * 100) : 0 },
+                ].filter((d) => d.value > 0);
+
+                if (radarData.length < 3) return null;
+
+                return (
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm">Perfil físico (última evaluación)</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={250}>
+                        <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="70%">
+                          <PolarGrid stroke="hsl(var(--border))" />
+                          <PolarAngleAxis
+                            dataKey="metric"
+                            tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                          />
+                          <PolarRadiusAxis
+                            angle={90}
+                            domain={[0, 100]}
+                            tick={false}
+                            axisLine={false}
+                          />
+                          <Radar
+                            name="Valor"
+                            dataKey="value"
+                            stroke="#ff2e93"
+                            fill="#ff2e93"
+                            fillOpacity={0.25}
+                            strokeWidth={2}
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              background: "hsl(var(--card))",
+                              border: "1px solid hsl(var(--border))",
+                              borderRadius: 8,
+                              fontSize: 12,
+                            }}
+                            formatter={(value: any) => [`${Math.round(Number(value))}%`, "Rendimiento"]}
+                          />
+                        </RadarChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
                 );
               })()}
 

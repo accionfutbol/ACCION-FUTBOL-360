@@ -26,6 +26,8 @@ import {
   UserCog,
   Send,
   UserPlus,
+  IdCard,
+  AlertTriangle,
 } from "lucide-react";
 import { useState } from "react";
 import type { UserRole } from "@/lib/types";
@@ -40,6 +42,8 @@ const entrenadorLinks = [
   { href: "/entrenador/evaluaciones", label: "Evaluaciones", icon: Star },
   { href: "/entrenador/eval-fisicas", label: "Eval. Físicas", icon: Activity },
   { href: "/entrenador/jugadores", label: "Data Jugadores", icon: Users },
+  { href: "/entrenador/convocatorias", label: "Convocatorias", icon: Send },
+  { href: "/entrenador/alertas", label: "Alertas", icon: AlertTriangle },
   { href: "/entrenador/comunicaciones", label: "Avisos", icon: Megaphone },
 ];
 
@@ -56,6 +60,8 @@ const adminLinks = [
   { href: "/entrenador/evaluaciones", label: "Evaluaciones", icon: Star },
   { href: "/entrenador/eval-fisicas", label: "Eval. Físicas", icon: Activity },
   { href: "/entrenador/jugadores", label: "Data Jugadores", icon: Users },
+  { href: "/entrenador/convocatorias", label: "Convocatorias", icon: Send },
+  { href: "/entrenador/alertas", label: "Alertas", icon: AlertTriangle },
   { href: "/entrenador/comunicaciones", label: "Avisos", icon: Megaphone },
 ];
 
@@ -66,6 +72,8 @@ const apoderadoLinks = [
   { href: "/apoderado/partidos", label: "Partidos", icon: Trophy },
   { href: "/apoderado/evaluaciones", label: "Evaluaciones", icon: Activity },
   { href: "/apoderado/pagos", label: "Pagos", icon: DollarSign },
+  { href: "/apoderado/convocatorias", label: "Convocatorias", icon: Trophy },
+  { href: "/apoderado/credencial", label: "Credencial", icon: IdCard },
   { href: "/apoderado/justificar", label: "Justificar", icon: Send },
 ];
 

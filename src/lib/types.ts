@@ -24,6 +24,8 @@ export type UserRole = "entrenador" | "apoderado" | "admin";
 
 export type EstadoConvocatoria = "TITULAR" | "SUPLENTE" | "INGRESO" | "NO_CITADO";
 
+export type RespuestaConvocatoria = "CONFIRMADO" | "NO_PUEDE" | "PENDIENTE";
+
 export type EstadoPago = "PAGADO" | "PENDIENTE" | "ATRASADO" | "BECADO" | "CONGELADO";
 
 export interface Database {
@@ -383,6 +385,40 @@ export interface Database {
         };
         Insert: Omit<Database["public"]["Tables"]["dias_entrenamiento"]["Row"], "id" | "created_at">;
         Update: Partial<Database["public"]["Tables"]["dias_entrenamiento"]["Insert"]>;
+      };
+      convocatorias: {
+        Row: {
+          id: string;
+          partido_id: string | null;
+          categoria_id: string;
+          sede_id: string;
+          fecha: string;
+          hora: string | null;
+          lugar: string | null;
+          rival: string | null;
+          mensaje: string | null;
+          entrenador_id: string | null;
+          estado: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["convocatorias"]["Row"], "id" | "created_at" | "updated_at">;
+        Update: Partial<Database["public"]["Tables"]["convocatorias"]["Insert"]>;
+      };
+      convocatoria_jugador: {
+        Row: {
+          id: string;
+          convocatoria_id: string;
+          jugador_id: string;
+          citado: boolean;
+          respuesta: RespuestaConvocatoria | null;
+          respondido_por: string | null;
+          respondido_at: string | null;
+          observacion: string | null;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["convocatoria_jugador"]["Row"], "id" | "created_at">;
+        Update: Partial<Database["public"]["Tables"]["convocatoria_jugador"]["Insert"]>;
       };
     };
     Views: Record<string, never>;
