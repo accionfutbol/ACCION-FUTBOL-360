@@ -31,6 +31,8 @@ import {
   FileSpreadsheet,
   Shirt,
   Award,
+  Camera,
+  TrendingDown,
 } from "lucide-react";
 import { useState } from "react";
 import type { UserRole } from "@/lib/types";
@@ -50,6 +52,7 @@ const entrenadorLinks = [
   { href: "/entrenador/torneos", label: "Torneos", icon: Award },
   { href: "/entrenador/certificados", label: "Certificados", icon: FileText },
   { href: "/entrenador/informe-jugador", label: "Informe PDF", icon: FileText },
+  { href: "/entrenador/fotos", label: "Fotos", icon: Camera },
   { href: "/entrenador/alertas", label: "Alertas", icon: AlertTriangle },
   { href: "/entrenador/comunicaciones", label: "Avisos", icon: Megaphone },
 ];
@@ -61,6 +64,7 @@ const adminLinks = [
   { href: "/admin/usuarios", label: "Usuarios", icon: UserCog },
   { href: "/admin/inscripciones", label: "Inscripciones", icon: UserPlus },
   { href: "/admin/reportes", label: "Reportes", icon: FileSpreadsheet },
+  { href: "/admin/morosidad", label: "Morosidad", icon: TrendingDown },
   { href: "/entrenador/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/entrenador/asistencia", label: "Asistencia", icon: ClipboardList },
   { href: "/entrenador/reporte", label: "Reportes", icon: BarChart3 },
@@ -73,6 +77,7 @@ const adminLinks = [
   { href: "/entrenador/torneos", label: "Torneos", icon: Award },
   { href: "/entrenador/certificados", label: "Certificados", icon: FileText },
   { href: "/entrenador/informe-jugador", label: "Informe PDF", icon: FileText },
+  { href: "/entrenador/fotos", label: "Fotos", icon: Camera },
   { href: "/entrenador/alertas", label: "Alertas", icon: AlertTriangle },
   { href: "/entrenador/comunicaciones", label: "Avisos", icon: Megaphone },
 ];
@@ -85,6 +90,8 @@ const apoderadoLinks = [
   { href: "/apoderado/evaluaciones", label: "Evaluaciones", icon: Activity },
   { href: "/apoderado/pagos", label: "Pagos", icon: DollarSign },
   { href: "/apoderado/convocatorias", label: "Convocatorias", icon: Trophy },
+  { href: "/apoderado/uniformes", label: "Uniformes", icon: Shirt },
+  { href: "/apoderado/fotos", label: "Fotos", icon: Camera },
   { href: "/apoderado/credencial", label: "Credencial", icon: IdCard },
   { href: "/apoderado/justificar", label: "Justificar", icon: Send },
 ];

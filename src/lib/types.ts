@@ -489,6 +489,20 @@ export interface Database {
         Insert: Omit<Database["public"]["Tables"]["torneo_jugador"]["Row"], "id" | "created_at">;
         Update: Partial<Database["public"]["Tables"]["torneo_jugador"]["Insert"]>;
       };
+      albums: {
+        Row: {
+          id: string;
+          sede_id: string | null;
+          categoria_id: string | null;
+          mes: string | null;
+          concepto: string;
+          link_drive: string | null;
+          tipo: "FOTO" | "VIDEO";
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["albums"]["Row"], "id" | "created_at">;
+        Update: Partial<Database["public"]["Tables"]["albums"]["Insert"]>;
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
