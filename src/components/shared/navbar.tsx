@@ -68,6 +68,7 @@ const adminLinks = [
   { href: "/admin/morosidad", label: "Morosidad", icon: TrendingDown },
   { href: "/admin/retencion", label: "Retención", icon: Activity },
   { href: "/admin/proyeccion", label: "Proyección $", icon: DollarSign },
+  { href: "/admin/auditoria", label: "Auditoría", icon: FileSpreadsheet },
   { href: "/entrenador/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/entrenador/asistencia", label: "Asistencia", icon: ClipboardList },
   { href: "/entrenador/reporte", label: "Reportes", icon: BarChart3 },
