@@ -62,6 +62,7 @@ const adminLinks = [
   { href: "/admin/pagos", label: "Pagos", icon: DollarSign },
   { href: "/admin/sedes", label: "Sedes", icon: MapPin },
   { href: "/admin/usuarios", label: "Usuarios", icon: UserCog },
+  { href: "/admin/entrenadores", label: "Entrenadores", icon: Users },
   { href: "/admin/inscripciones", label: "Inscripciones", icon: UserPlus },
   { href: "/admin/reportes", label: "Reportes", icon: FileSpreadsheet },
   { href: "/admin/morosidad", label: "Morosidad", icon: TrendingDown },
