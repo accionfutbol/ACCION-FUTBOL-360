@@ -33,6 +33,7 @@ import {
   Award,
   Camera,
   TrendingDown,
+  HeartPulse,
 } from "lucide-react";
 import { useState } from "react";
 import type { UserRole } from "@/lib/types";
@@ -53,6 +54,7 @@ const entrenadorLinks = [
   { href: "/entrenador/certificados", label: "Certificados", icon: FileText },
   { href: "/entrenador/informe-jugador", label: "Informe PDF", icon: FileText },
   { href: "/entrenador/fotos", label: "Fotos", icon: Camera },
+  { href: "/entrenador/lesiones", label: "Lesiones", icon: HeartPulse },
   { href: "/entrenador/alertas", label: "Alertas", icon: AlertTriangle },
   { href: "/entrenador/comunicaciones", label: "Avisos", icon: Megaphone },
 ];
@@ -82,6 +84,7 @@ const adminLinks = [
   { href: "/entrenador/certificados", label: "Certificados", icon: FileText },
   { href: "/entrenador/informe-jugador", label: "Informe PDF", icon: FileText },
   { href: "/entrenador/fotos", label: "Fotos", icon: Camera },
+  { href: "/entrenador/lesiones", label: "Lesiones", icon: HeartPulse },
   { href: "/entrenador/alertas", label: "Alertas", icon: AlertTriangle },
   { href: "/entrenador/comunicaciones", label: "Avisos", icon: Megaphone },
 ];
