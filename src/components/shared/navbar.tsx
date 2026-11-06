@@ -48,6 +48,8 @@ const entrenadorLinks = [
   { href: "/entrenador/convocatorias", label: "Convocatorias", icon: Send },
   { href: "/entrenador/uniformes", label: "Uniformes", icon: Shirt },
   { href: "/entrenador/torneos", label: "Torneos", icon: Award },
+  { href: "/entrenador/certificados", label: "Certificados", icon: FileText },
+  { href: "/entrenador/informe-jugador", label: "Informe PDF", icon: FileText },
   { href: "/entrenador/alertas", label: "Alertas", icon: AlertTriangle },
   { href: "/entrenador/comunicaciones", label: "Avisos", icon: Megaphone },
 ];
@@ -69,6 +71,8 @@ const adminLinks = [
   { href: "/entrenador/convocatorias", label: "Convocatorias", icon: Send },
   { href: "/entrenador/uniformes", label: "Uniformes", icon: Shirt },
   { href: "/entrenador/torneos", label: "Torneos", icon: Award },
+  { href: "/entrenador/certificados", label: "Certificados", icon: FileText },
+  { href: "/entrenador/informe-jugador", label: "Informe PDF", icon: FileText },
   { href: "/entrenador/alertas", label: "Alertas", icon: AlertTriangle },
   { href: "/entrenador/comunicaciones", label: "Avisos", icon: Megaphone },
 ];

@@ -34,6 +34,8 @@ export type TipoTorneo = "INTERNO" | "EXTERNO" | "AMISTOSO";
 
 export type EstadoTorneo = "PLANIFICADO" | "EN_CURSO" | "FINALIZADO" | "CANCELADO";
 
+export type TipoCertificado = "PARTICIPACION" | "PERTENENCIA" | "LOGRO" | "ASISTENCIA" | "OTRO";
+
 export interface Database {
   public: {
     Tables: {
@@ -425,6 +427,20 @@ export interface Database {
         };
         Insert: Omit<Database["public"]["Tables"]["convocatoria_jugador"]["Row"], "id" | "created_at">;
         Update: Partial<Database["public"]["Tables"]["convocatoria_jugador"]["Insert"]>;
+      };
+      certificados: {
+        Row: {
+          id: string;
+          jugador_id: string;
+          tipo: TipoCertificado;
+          titulo: string;
+          descripcion: string | null;
+          emitido_por: string | null;
+          fecha_emision: string;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["certificados"]["Row"], "id" | "created_at">;
+        Update: Partial<Database["public"]["Tables"]["certificados"]["Insert"]>;
       };
       uniformes: {
         Row: {
