@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Image from "next/image";
+import Link from "next/link";
 import { Loader2 } from "lucide-react";
 
 export default function LoginPage() {
@@ -116,11 +117,33 @@ export default function LoginPage() {
                 "Ingresar"
               )}
             </Button>
+
+            <div className="text-center">
+              <Link
+                href="/recuperar"
+                className="text-xs text-white/40 hover:text-white/60 transition-colors"
+              >
+                ¿Olvidaste tu contraseña?
+              </Link>
+            </div>
           </form>
         </div>
 
+        {/* Inscripción */}
+        <div className="mt-4 text-center">
+          <p className="text-xs text-white/40">
+            ¿Quieres inscribir a tu hijo?{" "}
+            <Link
+              href="/inscripcion"
+              className="font-medium text-[#e0267e]/80 hover:text-[#e0267e] transition-colors"
+            >
+              Inscripción online
+            </Link>
+          </p>
+        </div>
+
         {/* Footer */}
-        <p className="mt-6 text-center text-xs text-white/30">
+        <p className="mt-4 text-center text-xs text-white/30">
           Academia de Fútbol · Chile
         </p>
       </div>

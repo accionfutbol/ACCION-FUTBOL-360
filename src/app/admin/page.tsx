@@ -48,6 +48,8 @@ interface Stats {
   totalEntrenadores: number;
   totalCategorias: number;
   becados: number;
+  asistenciaPromedio: number;
+  ingresoMensual: number;
 }
 
 interface SedeData {
@@ -94,6 +96,7 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState<Stats>({
     totalJugadores: 0, activos: 0, morosos: 0, partidosMes: 0,
     inscripcionesPendientes: 0, totalEntrenadores: 0, totalCategorias: 0, becados: 0,
+    asistenciaPromedio: 0, ingresoMensual: 0,
   });
   const [sedeData, setSedeData] = useState<SedeData[]>([]);
   const [estadoData, setEstadoData] = useState<EstadoData[]>([]);
@@ -103,8 +106,8 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     async function load() {
-      const [jugRes, morosRes, partRes, inscRes, entRes, catRes, sedesRes, mensRes] = await Promise.all([
-        supabase.from("jugadores").select("id, estado, sede_id", { count: "exact", head: false }),
+      const [jugRes, morosRes, partRes, inscRes, entRes, catRes, sedesRes, mensRes, asistRes] = await Promise.all([
+        supabase.from("jugadores").select("id, estado, sede_id, pago_mensual", { count: "exact", head: false }),
         supabase.from("mensualidades").select("id", { count: "exact", head: true }).eq("estado", "ATRASADO"),
         supabase.from("partidos").select("id", { count: "exact", head: true })
           .gte("fecha", new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10)),
@@ -113,7 +116,8 @@ export default function AdminDashboard() {
         supabase.from("entrenadores").select("id", { count: "exact", head: true }),
         supabase.from("categorias").select("id", { count: "exact", head: true }).eq("activa", true),
         supabase.from("sedes").select("id, nombre").eq("activa", true).order("nombre"),
-        supabase.from("mensualidades").select("mes, estado"),
+        supabase.from("mensualidades").select("mes, estado, monto"),
+        supabase.from("asistencia").select("marca"),
       ]);
 
       const jugadores = (jugRes.data ?? []) as any[];
@@ -124,6 +128,19 @@ export default function AdminDashboard() {
 
       const pendientes = ((inscRes.data ?? []) as any[]).filter((i) => i.estado === "PENDIENTE").length;
 
+      const marcasAsist = (asistRes.data ?? []) as { marca: string }[];
+      const totalMarcas = marcasAsist.length;
+      const okMarcas = marcasAsist.filter((m) => m.marca === "OK").length;
+      const asistPct = totalMarcas > 0 ? Math.round((okMarcas / totalMarcas) * 100) : 0;
+
+      const activosPagantes = jugadores.filter((j: any) =>
+        ["ACTIVO", "FULL", "NEW"].includes(j.estado)
+      );
+      const pagos = activosPagantes
+        .map((j: any) => parseInt(j.pago_mensual, 10))
+        .filter((v: number) => !isNaN(v) && v > 0);
+      const ingresoMes = pagos.reduce((s: number, v: number) => s + v, 0);
+
       setStats({
         totalJugadores: jugRes.count ?? jugadores.length,
         activos,
@@ -133,6 +150,8 @@ export default function AdminDashboard() {
         totalEntrenadores: entRes.count ?? 0,
         totalCategorias: catRes.count ?? 0,
         becados,
+        asistenciaPromedio: asistPct,
+        ingresoMensual: ingresoMes,
       });
 
       // Distribución por sede
@@ -222,7 +241,7 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <KPICard icon={MapPin} label="Categorías activas" value={stats.totalCategorias} color="text-blue-400" />
         <KPICard icon={UserCog} label="Entrenadores" value={stats.totalEntrenadores} color="text-purple-400" />
-        <KPICard icon={DollarSign} label="Becados" value={stats.becados} color="text-violet-400" />
+        <KPICard icon={Activity} label="Asistencia prom." value={stats.asistenciaPromedio} color="text-cyan-400" subtitle="% presentes" />
         <KPICard
           icon={UserPlus}
           label="Inscr. pendientes"
@@ -231,6 +250,28 @@ export default function AdminDashboard() {
           href="/admin/inscripciones"
         />
       </div>
+
+      {/* Ingreso mensual estimado */}
+      <Card>
+        <CardContent className="flex items-center justify-between p-4">
+          <div className="flex items-center gap-3">
+            <DollarSign className="h-6 w-6 text-emerald-400" />
+            <div>
+              <p className="text-sm text-muted-foreground">Ingreso mensual estimado</p>
+              <p className="text-2xl font-bold text-emerald-400">
+                ${stats.ingresoMensual.toLocaleString("es-CL")}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+            <span>{stats.activos} activos</span>
+            <span>{stats.becados} becados</span>
+            <Link href="/admin/proyeccion" className="text-primary hover:underline">
+              Ver proyección →
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Charts Row */}
       <div className="grid gap-4 lg:grid-cols-2">

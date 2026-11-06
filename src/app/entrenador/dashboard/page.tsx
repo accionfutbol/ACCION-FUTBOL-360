@@ -4,8 +4,10 @@ import { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   Loader2, Users, UserCheck, UserX, AlertTriangle, DollarSign,
-  TrendingUp, MapPin, ChevronDown, ChevronUp,
+  TrendingUp, MapPin, ChevronDown, ChevronUp, ClipboardList,
+  CalendarDays, Trophy, ArrowRight,
 } from "lucide-react";
+import Link from "next/link";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, LineChart, Line,
@@ -58,6 +60,8 @@ export default function DashboardPage() {
   const [asistencia, setAsistencia] = useState<AsistenciaStat[]>([]);
   const [loading, setLoading] = useState(true);
   const [sedesCollapsed, setSedesCollapsed] = useState<Record<string, boolean>>({});
+  const [sesionesHoy, setSesionesHoy] = useState<{ id: string; sede_nombre: string; categoria_nombre: string; horario: string }[]>([]);
+  const [alertas, setAlertas] = useState<{ tipo: string; texto: string; color: string; href: string }[]>([]);
 
   useEffect(() => {
     async function load() {
@@ -111,6 +115,55 @@ export default function DashboardPage() {
           fecha: m.sesiones_entrenamiento?.fecha ?? "",
         })));
       }
+
+      const hoy = new Date().toISOString().slice(0, 10);
+      const { data: sesHoy } = await supabase
+        .from("sesiones_entrenamiento")
+        .select("id, horario, sedes(nombre), categorias(nombre)")
+        .eq("fecha", hoy)
+        .order("horario") as { data: any[] | null; error: any };
+      if (sesHoy) {
+        setSesionesHoy(sesHoy.map((s: any) => ({
+          id: s.id,
+          sede_nombre: s.sedes?.nombre ?? "",
+          categoria_nombre: s.categorias?.nombre ?? "",
+          horario: s.horario ?? "",
+        })));
+      }
+
+      // Calcular alertas
+      const alertasList: { tipo: string; texto: string; color: string; href: string }[] = [];
+      const lesionados = allJugs.filter((j: any) => j.estado === "LESIONADO").length;
+      if (lesionados > 0) {
+        alertasList.push({ tipo: "salud", texto: `${lesionados} jugador${lesionados > 1 ? "es" : ""} lesionado${lesionados > 1 ? "s" : ""}`, color: "text-red-400", href: "/entrenador/lesiones" });
+      }
+      const morososCount = allJugs.filter((j: any) => (j.pago_mensual || "").toUpperCase().includes("MOROS")).length;
+      if (morososCount > 0) {
+        alertasList.push({ tipo: "pagos", texto: `${morososCount} jugador${morososCount > 1 ? "es" : ""} moroso${morososCount > 1 ? "s" : ""}`, color: "text-yellow-400", href: "/entrenador/jugadores" });
+      }
+      const treinta = new Date();
+      treinta.setDate(treinta.getDate() - 30);
+      const treintaStr = treinta.toISOString().slice(0, 10);
+      const faltasRecientes = (marks ?? []).filter((m: any) => {
+        const fecha = m.sesiones_entrenamiento?.fecha ?? "";
+        return fecha >= treintaStr && m.marca === "F";
+      });
+      const faltasPorJugador = new Map<string, number>();
+      faltasRecientes.forEach((m: any) => {
+        faltasPorJugador.set(m.jugador_id, (faltasPorJugador.get(m.jugador_id) ?? 0) + 1);
+      });
+      const jugadores3Faltas = [...faltasPorJugador.entries()].filter(([, c]) => c >= 3).length;
+      if (jugadores3Faltas > 0) {
+        alertasList.push({ tipo: "asistencia", texto: `${jugadores3Faltas} jugador${jugadores3Faltas > 1 ? "es" : ""} con 3+ faltas (últ. 30 días)`, color: "text-orange-400", href: "/entrenador/alertas" });
+      }
+      const catsFullCount = (catsRes.data ?? []).filter((cat: any) => {
+        const jugsCat = allJugs.filter((j: any) => j.categoria_id === cat.id && ESTADOS_ACTIVOS.includes(j.estado));
+        return jugsCat.length >= CAPACIDAD_MAX;
+      }).length;
+      if (catsFullCount > 0) {
+        alertasList.push({ tipo: "capacidad", texto: `${catsFullCount} categoría${catsFullCount > 1 ? "s" : ""} al máximo de capacidad`, color: "text-primary", href: "/entrenador/jugadores" });
+      }
+      setAlertas(alertasList);
 
       setLoading(false);
     }
@@ -247,6 +300,49 @@ export default function DashboardPage() {
         <p className="text-xs text-muted-foreground">Data Futbol · Temporada {new Date().getFullYear()}</p>
       </div>
 
+      {/* Acciones rapidas de hoy */}
+      <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
+        <div className="mb-3 flex items-center gap-2">
+          <CalendarDays className="h-4 w-4 text-primary" />
+          <h2 className="text-sm font-bold">Hoy — {new Date().toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" })}</h2>
+        </div>
+        {sesionesHoy.length > 0 ? (
+          <div className="mb-3 space-y-2">
+            {sesionesHoy.map((s) => (
+              <div key={s.id} className="flex items-center justify-between rounded-lg bg-card/60 px-3 py-2">
+                <div>
+                  <p className="text-sm font-medium">{s.categoria_nombre}</p>
+                  <p className="text-xs text-muted-foreground">{s.sede_nombre}{s.horario ? ` · ${s.horario}` : ""}</p>
+                </div>
+                <Link
+                  href="/entrenador/asistencia"
+                  className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+                >
+                  <ClipboardList className="h-3.5 w-3.5" />
+                  Tomar Asistencia
+                </Link>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="mb-3 text-xs text-muted-foreground">Sin sesiones registradas para hoy</p>
+        )}
+        <div className="flex flex-wrap gap-2">
+          <Link href="/entrenador/reporte-entrenamiento" className="flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted">
+            <ClipboardList className="h-3.5 w-3.5" /> Reporte DT
+          </Link>
+          <Link href="/entrenador/partidos" className="flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted">
+            <Trophy className="h-3.5 w-3.5" /> Partidos
+          </Link>
+          <Link href="/entrenador/jugadores" className="flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted">
+            <Users className="h-3.5 w-3.5" /> Jugadores
+          </Link>
+          <Link href="/entrenador/evaluaciones" className="flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted">
+            <ArrowRight className="h-3.5 w-3.5" /> Evaluaciones
+          </Link>
+        </div>
+      </div>
+
       {/* KPIs principales */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <KpiCard icon={Users} label="Total Jugadores" value={stats.total} color="text-primary" />
@@ -258,6 +354,25 @@ export default function DashboardPage() {
         <KpiCard icon={Users} label="Desactivados" value={stats.byEstado["DESACTIVADO"] || 0} color="text-muted-foreground" />
         <KpiCard icon={Users} label="Lesionados" value={stats.byEstado["LESIONADO"] || 0} color="text-red-400" />
       </div>
+
+      {/* Alertas */}
+      {alertas.length > 0 && (
+        <div className="rounded-xl border border-orange-500/30 bg-orange-500/5 p-4">
+          <div className="mb-2 flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-orange-400" />
+            <h2 className="text-sm font-bold text-orange-400">Alertas</h2>
+          </div>
+          <div className="space-y-1.5">
+            {alertas.map((a, i) => (
+              <Link key={i} href={a.href} className="flex items-center gap-2 text-sm hover:underline">
+                <span className={`inline-block h-2 w-2 rounded-full ${a.color.replace("text-", "bg-")}`} />
+                <span className={a.color}>{a.texto}</span>
+                <ArrowRight className={`h-3 w-3 ${a.color}`} />
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ═══════ CAPACIDAD POR SEDE Y CATEGORIA ═══════ */}
       <div className="space-y-4">

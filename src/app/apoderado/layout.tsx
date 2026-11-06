@@ -1,6 +1,11 @@
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { Navbar } from "@/components/shared/navbar";
+
+export const metadata: Metadata = {
+  title: "Mi Portal — Acción Fútbol",
+};
 
 export default async function ApoderadoLayout({
   children,
@@ -24,9 +29,11 @@ export default async function ApoderadoLayout({
   const nombre = profile?.nombre ?? user.email ?? "";
 
   return (
-    <>
+    <div className="flex min-h-full">
       <Navbar role={role} nombre={nombre} />
-      <main className="mx-auto w-full max-w-5xl flex-1 p-4">{children}</main>
-    </>
+      <main className="flex-1 md:ml-56">
+        <div className="mx-auto w-full max-w-5xl p-4">{children}</div>
+      </main>
+    </div>
   );
 }

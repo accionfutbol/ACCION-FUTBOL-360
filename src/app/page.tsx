@@ -15,8 +15,12 @@ export default async function HomePage() {
     .eq("id", user.id)
     .single();
 
-  if (profile?.role === "entrenador" || profile?.role === "admin") {
-    redirect("/entrenador/asistencia");
+  if (profile?.role === "admin") {
+    redirect("/admin");
+  }
+
+  if (profile?.role === "entrenador") {
+    redirect("/entrenador/dashboard");
   }
 
   if (profile?.role === "apoderado") {

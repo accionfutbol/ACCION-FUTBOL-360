@@ -13,6 +13,7 @@ import {
   ChevronRight,
   Timer,
   Goal,
+  CalendarDays,
 } from "lucide-react";
 
 interface HijoResumen {
@@ -49,6 +50,13 @@ interface UltimoPartidoStats {
   estado: string;
 }
 
+interface PlanSemanal {
+  id: string;
+  titulo: string;
+  fecha: string;
+  objetivo: string | null;
+}
+
 interface Aviso {
   id: string;
   titulo: string;
@@ -62,6 +70,7 @@ export default function ApoderadoDashboard() {
   const [proximoPartido, setProximoPartido] = useState<ProximoPartido | null>(null);
   const [resumenPagos, setResumenPagos] = useState<ResumenPago>({ pendientes: 0, atrasados: 0 });
   const [ultimoPartido, setUltimoPartido] = useState<UltimoPartidoStats | null>(null);
+  const [planSemanal, setPlanSemanal] = useState<PlanSemanal[]>([]);
   const [avisos, setAvisos] = useState<Aviso[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -185,6 +194,27 @@ export default function ApoderadoDashboard() {
           pendientes: msgs.filter(m => m.estado === "PENDIENTE").length,
           atrasados: msgs.filter(m => m.estado === "ATRASADO").length,
         });
+      }
+
+      // Planificación semanal
+      const hoyDate = new Date();
+      const lunes = new Date(hoyDate);
+      lunes.setDate(hoyDate.getDate() - ((hoyDate.getDay() + 6) % 7));
+      const domingo = new Date(lunes);
+      domingo.setDate(lunes.getDate() + 6);
+      const lunesStr = lunes.toISOString().slice(0, 10);
+      const domingoStr = domingo.toISOString().slice(0, 10);
+
+      if (categoriaIds.length > 0) {
+        const { data: planes } = await supabase
+          .from("planificaciones")
+          .select("id, titulo, fecha, objetivo")
+          .in("categoria_id", categoriaIds)
+          .gte("fecha", lunesStr)
+          .lte("fecha", domingoStr)
+          .order("fecha", { ascending: true })
+          .limit(7);
+        setPlanSemanal((planes ?? []) as PlanSemanal[]);
       }
 
       // Avisos recientes
@@ -376,6 +406,41 @@ export default function ApoderadoDashboard() {
           </Card>
         </Link>
       </div>
+
+      {/* Planificación semanal */}
+      <Link href="/apoderado/planificacion">
+        <Card className="group cursor-pointer transition-colors hover:border-primary/50">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CalendarDays className="h-4 w-4 text-primary" />
+                <CardTitle className="text-sm">Planificación de la Semana</CardTitle>
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            {planSemanal.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Sin planificaciones publicadas esta semana</p>
+            ) : (
+              <div className="space-y-1.5">
+                {planSemanal.map((p) => {
+                  const dia = new Date(p.fecha + "T12:00:00").toLocaleDateString("es-CL", { weekday: "long", day: "numeric" });
+                  return (
+                    <div key={p.id} className="flex items-start gap-2 text-sm">
+                      <span className="w-24 shrink-0 text-xs font-medium capitalize text-primary">{dia}</span>
+                      <div className="min-w-0">
+                        <p className="font-medium">{p.titulo}</p>
+                        {p.objetivo && <p className="truncate text-xs text-muted-foreground">{p.objetivo}</p>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </Link>
 
       {/* Avisos recientes */}
       {avisos.length > 0 && (

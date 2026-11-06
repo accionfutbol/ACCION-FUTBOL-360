@@ -1,6 +1,11 @@
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { Navbar } from "@/components/shared/navbar";
+
+export const metadata: Metadata = {
+  title: "Entrenador — Acción Fútbol",
+};
 
 export default async function EntrenadorLayout({
   children,
