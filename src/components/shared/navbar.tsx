@@ -29,6 +29,8 @@ import {
   IdCard,
   AlertTriangle,
   FileSpreadsheet,
+  Shirt,
+  Award,
 } from "lucide-react";
 import { useState } from "react";
 import type { UserRole } from "@/lib/types";
@@ -44,6 +46,8 @@ const entrenadorLinks = [
   { href: "/entrenador/eval-fisicas", label: "Eval. Físicas", icon: Activity },
   { href: "/entrenador/jugadores", label: "Data Jugadores", icon: Users },
   { href: "/entrenador/convocatorias", label: "Convocatorias", icon: Send },
+  { href: "/entrenador/uniformes", label: "Uniformes", icon: Shirt },
+  { href: "/entrenador/torneos", label: "Torneos", icon: Award },
   { href: "/entrenador/alertas", label: "Alertas", icon: AlertTriangle },
   { href: "/entrenador/comunicaciones", label: "Avisos", icon: Megaphone },
 ];
@@ -63,6 +67,8 @@ const adminLinks = [
   { href: "/entrenador/eval-fisicas", label: "Eval. Físicas", icon: Activity },
   { href: "/entrenador/jugadores", label: "Data Jugadores", icon: Users },
   { href: "/entrenador/convocatorias", label: "Convocatorias", icon: Send },
+  { href: "/entrenador/uniformes", label: "Uniformes", icon: Shirt },
+  { href: "/entrenador/torneos", label: "Torneos", icon: Award },
   { href: "/entrenador/alertas", label: "Alertas", icon: AlertTriangle },
   { href: "/entrenador/comunicaciones", label: "Avisos", icon: Megaphone },
 ];

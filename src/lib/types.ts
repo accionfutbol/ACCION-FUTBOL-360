@@ -28,6 +28,12 @@ export type RespuestaConvocatoria = "CONFIRMADO" | "NO_PUEDE" | "PENDIENTE";
 
 export type EstadoPago = "PAGADO" | "PENDIENTE" | "ATRASADO" | "BECADO" | "CONGELADO";
 
+export type TipoUniforme = "NEGRO" | "ROSADO" | "POLERON" | "SHORT" | "MEDIAS" | "OTRO";
+
+export type TipoTorneo = "INTERNO" | "EXTERNO" | "AMISTOSO";
+
+export type EstadoTorneo = "PLANIFICADO" | "EN_CURSO" | "FINALIZADO" | "CANCELADO";
+
 export interface Database {
   public: {
     Tables: {
@@ -420,6 +426,53 @@ export interface Database {
         Insert: Omit<Database["public"]["Tables"]["convocatoria_jugador"]["Row"], "id" | "created_at">;
         Update: Partial<Database["public"]["Tables"]["convocatoria_jugador"]["Insert"]>;
       };
+      uniformes: {
+        Row: {
+          id: string;
+          jugador_id: string;
+          tipo: TipoUniforme;
+          talla: string | null;
+          entregado: boolean;
+          fecha_entrega: string | null;
+          observacion: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["uniformes"]["Row"], "id" | "created_at" | "updated_at">;
+        Update: Partial<Database["public"]["Tables"]["uniformes"]["Insert"]>;
+      };
+      torneos: {
+        Row: {
+          id: string;
+          nombre: string;
+          tipo: TipoTorneo;
+          fecha_inicio: string | null;
+          fecha_fin: string | null;
+          sede_id: string | null;
+          categoria_id: string | null;
+          lugar: string | null;
+          descripcion: string | null;
+          estado: EstadoTorneo;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["torneos"]["Row"], "id" | "created_at" | "updated_at">;
+        Update: Partial<Database["public"]["Tables"]["torneos"]["Insert"]>;
+      };
+      torneo_jugador: {
+        Row: {
+          id: string;
+          torneo_id: string;
+          jugador_id: string;
+          inscrito: boolean;
+          pagado: boolean;
+          monto: number | null;
+          observacion: string | null;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["torneo_jugador"]["Row"], "id" | "created_at">;
+        Update: Partial<Database["public"]["Tables"]["torneo_jugador"]["Insert"]>;
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -435,3 +488,4 @@ export interface Database {
     };
   };
 }
+

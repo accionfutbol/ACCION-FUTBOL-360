@@ -11,6 +11,8 @@ import {
   DollarSign,
   Megaphone,
   ChevronRight,
+  Timer,
+  Goal,
 } from "lucide-react";
 
 interface HijoResumen {
@@ -36,6 +38,17 @@ interface ResumenPago {
   atrasados: number;
 }
 
+interface UltimoPartidoStats {
+  fecha: string;
+  rival: string;
+  resultado: string;
+  jugadorNombre: string;
+  minutos: number;
+  goles: number;
+  asistencias: number;
+  estado: string;
+}
+
 interface Aviso {
   id: string;
   titulo: string;
@@ -48,6 +61,7 @@ export default function ApoderadoDashboard() {
   const [hijos, setHijos] = useState<HijoResumen[]>([]);
   const [proximoPartido, setProximoPartido] = useState<ProximoPartido | null>(null);
   const [resumenPagos, setResumenPagos] = useState<ResumenPago>({ pendientes: 0, atrasados: 0 });
+  const [ultimoPartido, setUltimoPartido] = useState<UltimoPartidoStats | null>(null);
   const [avisos, setAvisos] = useState<Aviso[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -123,6 +137,41 @@ export default function ApoderadoDashboard() {
           .limit(1);
         if (partidos?.length) {
           setProximoPartido(partidos[0] as ProximoPartido);
+        }
+      }
+
+      // Último partido jugado
+      const { data: ultimoPJ } = await supabase
+        .from("partido_jugador")
+        .select("partido_id, jugador_id, estado, minutos, goles, asistencias_gol")
+        .in("jugador_id", jugadorIds)
+        .neq("estado", "NO_CITADO")
+        .order("created_at", { ascending: false })
+        .limit(20) as { data: any[] | null; error: any };
+
+      if (ultimoPJ && ultimoPJ.length > 0) {
+        const partidoIds = [...new Set(ultimoPJ.map((p: any) => p.partido_id))];
+        const { data: partidosData } = await supabase
+          .from("partidos")
+          .select("id, fecha, rival, marcador_favor, marcador_contra")
+          .in("id", partidoIds)
+          .order("fecha", { ascending: false })
+          .limit(1);
+
+        if (partidosData?.length) {
+          const partido = partidosData[0] as any;
+          const pjRecord = ultimoPJ.find((p: any) => p.partido_id === partido.id);
+          const jugNombre = jugadores.find((j: any) => j.id === pjRecord?.jugador_id)?.nombre ?? "";
+          setUltimoPartido({
+            fecha: partido.fecha,
+            rival: partido.rival,
+            resultado: `${partido.marcador_favor}-${partido.marcador_contra}`,
+            jugadorNombre: jugNombre,
+            minutos: pjRecord?.minutos ?? 0,
+            goles: pjRecord?.goles ?? 0,
+            asistencias: pjRecord?.asistencias_gol ?? 0,
+            estado: pjRecord?.estado ?? "",
+          });
         }
       }
 
@@ -219,6 +268,51 @@ export default function ApoderadoDashboard() {
 
       {/* Widgets rápidos */}
       <div className="grid gap-4 sm:grid-cols-2">
+        {/* Último partido jugado */}
+        <Link href="/apoderado/partidos">
+          <Card className="group cursor-pointer transition-colors hover:border-primary/50">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Goal className="h-4 w-4 text-primary" />
+                  <CardTitle className="text-sm">Último Partido</CardTitle>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              {ultimoPartido ? (
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-lg font-bold">vs {ultimoPartido.rival}</p>
+                    <Badge variant="outline" className="text-xs">{ultimoPartido.resultado}</Badge>
+                  </div>
+                  <div className="mt-1.5 flex gap-4 text-xs">
+                    <span className="flex items-center gap-1 text-muted-foreground">
+                      <Timer className="h-3 w-3" /> {ultimoPartido.minutos} min
+                    </span>
+                    {ultimoPartido.goles > 0 && (
+                      <span className="font-semibold text-emerald-400">
+                        {ultimoPartido.goles} gol{ultimoPartido.goles > 1 ? "es" : ""}
+                      </span>
+                    )}
+                    {ultimoPartido.asistencias > 0 && (
+                      <span className="font-semibold text-blue-400">
+                        {ultimoPartido.asistencias} asist.
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-0.5 text-[10px] text-muted-foreground">
+                    {ultimoPartido.fecha} · {ultimoPartido.estado}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Sin partidos registrados</p>
+              )}
+            </CardContent>
+          </Card>
+        </Link>
+
         {/* Próximo partido */}
         <Link href="/apoderado/partidos">
           <Card className="group cursor-pointer transition-colors hover:border-primary/50">
