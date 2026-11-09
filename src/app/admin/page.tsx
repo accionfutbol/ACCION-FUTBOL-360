@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import {
   Loader2,
@@ -22,6 +23,7 @@ import {
   UserX,
   Clock,
   FileSpreadsheet,
+  RefreshCw,
 } from "lucide-react";
 import {
   BarChart,
@@ -103,9 +105,39 @@ export default function AdminDashboard() {
   const [pagoData, setPagoData] = useState<PagoMes[]>([]);
   const [inscRecientes, setInscRecientes] = useState<InscripcionReciente[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<string | null>(null);
+
+  async function handleSync() {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const res = await fetch("/api/sync-datafutbol", { method: "POST" });
+      const data = await res.json();
+      if (data.ok) {
+        setSyncResult(`Sync OK: ${data.actualizados} actualizados, ${data.omitidos} omitidos, ${data.errores} errores`);
+        loadData();
+      } else {
+        setSyncResult(`Error: ${data.error || "desconocido"}`);
+      }
+    } catch (e: any) {
+      setSyncResult(`Error: ${e.message}`);
+    }
+    setSyncing(false);
+  }
 
   useEffect(() => {
-    async function load() {
+    loadData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function loadData() {
+    setLoading(true);
+    await load();
+    setLoading(false);
+  }
+
+  async function load() {
       const [jugRes, morosRes, partRes, inscRes, entRes, catRes, sedesRes, mensRes, asistRes] = await Promise.all([
         supabase.from("jugadores").select("id, estado, sede_id, pago_mensual", { count: "exact", head: false }),
         supabase.from("mensualidades").select("id", { count: "exact", head: true }).eq("estado", "ATRASADO"),
@@ -204,10 +236,7 @@ export default function AdminDashboard() {
       // Inscripciones recientes
       setInscRecientes((inscRes.data ?? []) as InscripcionReciente[]);
 
-      setLoading(false);
-    }
-    load();
-  }, [supabase]);
+  }
 
   if (loading) {
     return (
@@ -225,10 +254,27 @@ export default function AdminDashboard() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">Panel Admin</h1>
-        <Badge variant="outline" className="text-xs">
-          <Activity className="mr-1 h-3 w-3" /> Dashboard 360°
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSync}
+            disabled={syncing}
+            className="text-xs"
+          >
+            {syncing ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <RefreshCw className="mr-1 h-3 w-3" />}
+            Sync Data Fútbol
+          </Button>
+          <Badge variant="outline" className="text-xs">
+            <Activity className="mr-1 h-3 w-3" /> Dashboard 360°
+          </Badge>
+        </div>
       </div>
+      {syncResult && (
+        <div className={`rounded-lg border p-3 text-xs ${syncResult.startsWith("Error") ? "border-red-500/50 bg-red-500/10 text-red-400" : "border-emerald-500/50 bg-emerald-500/10 text-emerald-400"}`}>
+          {syncResult}
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
