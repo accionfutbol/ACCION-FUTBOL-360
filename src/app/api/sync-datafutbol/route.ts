@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 
 const SPREADSHEET_ID = "196dXsAPdaJIQEnBV5ieI51kaGfWzhCxHCZJULN6np7M";
 const SHEET_RANGE = "Base!A4:BL1800";
+const BATCH_SIZE = 200;
 
 const VALID_ESTADOS = ["ACTIVO", "FULL", "NEW", "LESIONADO", "DESACTIVADO", "BECADO"];
 
@@ -48,8 +49,9 @@ function normalizeEstadoMes(raw: string): string | null {
   return null;
 }
 
+export const maxDuration = 60;
+
 export async function POST() {
-  // Auth check: only admin
   const supabaseAuth = await createServerClient();
   const { data: { user } } = await supabaseAuth.auth.getUser();
   if (!user) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
@@ -61,13 +63,11 @@ export async function POST() {
     .single();
   if (profile?.role !== "admin") return NextResponse.json({ error: "Solo admin" }, { status: 403 });
 
-  // Service role client to bypass RLS
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  // Read Google Sheets
   const apiKey = process.env.GOOGLE_API_KEY;
   if (!apiKey) return NextResponse.json({ error: "GOOGLE_API_KEY no configurada" }, { status: 500 });
 
@@ -84,7 +84,6 @@ export async function POST() {
     return NextResponse.json({ error: "Sin datos en la planilla" }, { status: 400 });
   }
 
-  // Load sedes and categorias for FK lookups
   const { data: sedes } = await supabase.from("sedes").select("id, nombre");
   const { data: categorias } = await supabase.from("categorias").select("id, sede_id, nombre");
 
@@ -95,125 +94,118 @@ export async function POST() {
   const catMap = new Map<string, string>();
   (categorias ?? []).forEach((c: any) => catMap.set(catKey(c.sede_id, c.nombre), c.id));
 
-  // Find a default categoria for fallback
   const { data: defaultCat } = await supabase
     .from("categorias")
     .select("id")
     .limit(1)
     .single();
 
-  let updated = 0;
-  let inserted = 0;
+  // --- Phase 1: Create missing categories (few, so individual calls are fine) ---
+  const missingCats = new Set<string>();
+  for (const row of rows) {
+    const sedeRaw = (row[9] || "").toUpperCase().trim();
+    const sedeName = SEDE_MAP[sedeRaw] || sedeRaw;
+    const sedeId = sedeByName.get(sedeName);
+    if (!sedeId) continue;
+    const catRaw = (row[11] || "").trim();
+    if (catRaw && catRaw !== "N/A" && catRaw !== "#N/A" && !catMap.get(catKey(sedeId, catRaw))) {
+      missingCats.add(`${sedeId}||${catRaw}`);
+    }
+  }
+
+  for (const key of missingCats) {
+    const [sedeId, catName] = key.split("||");
+    const { data: newCat } = await supabase
+      .from("categorias")
+      .upsert({ sede_id: sedeId, nombre: catName, activa: true }, { onConflict: "sede_id,nombre" })
+      .select("id")
+      .single();
+    if (newCat) {
+      catMap.set(catKey(sedeId, catName), newCat.id);
+    }
+  }
+
+  // --- Phase 2: Build all jugador records, then batch upsert ---
+  const jugadorBatch: Record<string, unknown>[] = [];
+  const rutToRowIdx = new Map<string, number>();
   let skipped = 0;
   const errors: string[] = [];
 
-  for (const row of rows) {
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
     const rut = (row[0] || "").trim();
     const nombre = (row[1] || "").trim();
     if (!nombre) continue;
 
-    // Skip rows without name
-    const estadoGen = normalizeEstado(row[2]);
-    const estadoMes = normalizeEstadoMes(row[3]);
-    const pagoMensual = (row[4] || "").trim() || null;
-    const numMorosidad = parseNum(row[5] || "");
-    const fechaNac = parseDate(row[6] || "");
-    const anioNac = parseNum(row[7] || "");
     const sedeRaw = (row[9] || "").toUpperCase().trim();
-    const tipo = (row[10] || "").trim() || null;
-    const catRaw = (row[11] || "").trim();
-    const nivel = (row[12] || "").trim() || null;
-    const subnivel = (row[13] || "").trim() || null;
-    const posicion = (row[20] || "").trim() || null;
-    const pie = (row[21] || "").trim() || null;
-    const emailJug = (row[22] || "").trim() || null;
-    const telJug = (row[23] || "").trim() || null;
-    const nombreApo = (row[24] || "").trim() || null;
-    const telApo = (row[25] || "").trim() || null;
-    const emailApo = (row[26] || "").trim() || null;
-
-    // Uniformes (cols AO=40, AP=41, AQ=42)
-    const poleron = (row[40] || "").trim() || null;
-    const uniformeNegro = (row[41] || "").trim() || null;
-    const uniformeRosado = (row[42] || "").trim() || null;
-
-    // Resolve sede
     const sedeName = SEDE_MAP[sedeRaw] || sedeRaw;
     const sedeId = sedeByName.get(sedeName);
-    if (!sedeId) {
-      skipped++;
-      continue;
-    }
+    if (!sedeId) { skipped++; continue; }
 
-    // Resolve categoria
+    const catRaw = (row[11] || "").trim();
     let categoriaId = catMap.get(catKey(sedeId, catRaw));
-    if (!categoriaId) {
-      // Try creating the category
-      if (catRaw && catRaw !== "N/A" && catRaw !== "#N/A") {
-        const { data: newCat, error: catErr } = await supabase
-          .from("categorias")
-          .upsert({ sede_id: sedeId, nombre: catRaw, activa: true }, { onConflict: "sede_id,nombre" })
-          .select("id")
-          .single();
-        if (newCat) {
-          categoriaId = newCat.id;
-          catMap.set(catKey(sedeId, catRaw), newCat.id);
-        }
-      }
-      if (!categoriaId) categoriaId = defaultCat?.id;
-    }
+    if (!categoriaId) categoriaId = defaultCat?.id;
+    if (!categoriaId) { skipped++; continue; }
 
-    if (!categoriaId) {
-      errors.push(`${nombre}: sin categoría`);
-      skipped++;
-      continue;
-    }
-
-    // Build jugador record
     const jugadorRut = rut || `SIN-RUT-${nombre.replace(/\s+/g, "-").substring(0, 30)}`;
+    const estadoMes = normalizeEstadoMes(row[3]);
+    const numMorosidad = parseNum(row[5] || "");
 
-    const jugadorData: Record<string, unknown> = {
+    const rec: Record<string, unknown> = {
       rut: jugadorRut,
       nombre,
-      estado: estadoGen,
+      estado: normalizeEstado(row[2]),
       sede_id: sedeId,
       categoria_id: categoriaId,
-      fecha_nacimiento: fechaNac,
-      posicion_principal: posicion,
-      pie_dominante: pie,
-      email_jugador: emailJug,
-      telefono_jugador: telJug,
-      telefono_apoderado: telApo,
-      nombre_apoderado: nombreApo,
-      email_apoderado: emailApo,
-      pago_mensual: pagoMensual,
+      fecha_nacimiento: parseDate(row[6] || ""),
+      posicion_principal: (row[20] || "").trim() || null,
+      pie_dominante: (row[21] || "").trim() || null,
+      email_jugador: (row[22] || "").trim() || null,
+      telefono_jugador: (row[23] || "").trim() || null,
+      telefono_apoderado: (row[25] || "").trim() || null,
+      nombre_apoderado: (row[24] || "").trim() || null,
+      email_apoderado: (row[26] || "").trim() || null,
+      pago_mensual: (row[4] || "").trim() || null,
       numero_morosidad: numMorosidad != null ? Math.max(0, Math.round(numMorosidad)) : 0,
-      tipo,
-      nivel,
-      subnivel,
-      anio_nacimiento: anioNac != null ? Math.round(anioNac) : null,
-      poleron,
-      uniforme_negro: uniformeNegro,
-      uniforme_rosado: uniformeRosado,
+      tipo: (row[10] || "").trim() || null,
+      nivel: (row[12] || "").trim() || null,
+      subnivel: (row[13] || "").trim() || null,
+      anio_nacimiento: (() => { const n = parseNum(row[7] || ""); return n != null ? Math.round(n) : null; })(),
+      poleron: (row[40] || "").trim() || null,
+      uniforme_negro: (row[41] || "").trim() || null,
+      uniforme_rosado: (row[42] || "").trim() || null,
     };
+    if (estadoMes) rec.estado_mes = estadoMes;
 
-    if (estadoMes) {
-      jugadorData.estado_mes = estadoMes;
-    }
+    jugadorBatch.push(rec);
+    rutToRowIdx.set(jugadorRut, i);
+  }
 
-    // Upsert by RUT
-    const { data: upserted, error: upsertErr } = await supabase
+  // Batch upsert jugadores in chunks
+  const upsertedMap = new Map<string, string>(); // rut -> id
+  for (let i = 0; i < jugadorBatch.length; i += BATCH_SIZE) {
+    const chunk = jugadorBatch.slice(i, i + BATCH_SIZE);
+    const { data, error } = await supabase
       .from("jugadores")
-      .upsert(jugadorData, { onConflict: "rut" })
-      .select("id")
-      .single();
+      .upsert(chunk, { onConflict: "rut" })
+      .select("id, rut");
 
-    if (upsertErr) {
-      errors.push(`${nombre} (${jugadorRut}): ${upsertErr.message}`);
+    if (error) {
+      errors.push(`Batch jugadores ${i}-${i + chunk.length}: ${error.message}`);
       continue;
     }
+    (data ?? []).forEach((j: any) => upsertedMap.set(j.rut, j.id));
+  }
 
-    // Sync eval_fisicas if data exists (cols BB=53, BD=55, BF=57, BH=59, BI=60, BJ=61, BK=62)
+  // --- Phase 3: Batch upsert eval_fisicas ---
+  const today = new Date().toISOString().slice(0, 10);
+  const evalFisicaBatch: Record<string, unknown>[] = [];
+
+  for (const [rut, jugadorId] of upsertedMap) {
+    const rowIdx = rutToRowIdx.get(rut);
+    if (rowIdx == null) continue;
+    const row = rows[rowIdx];
+
     const salto = parseNum(row[53] || "");
     const vel30m = parseNum(row[55] || "");
     const ift = parseNum(row[57] || "");
@@ -222,63 +214,63 @@ export async function POST() {
     const imc = parseNum(row[61] || "");
     const gc = parseNum(row[62] || "");
 
-    const hasEvalFisica = salto != null || vel30m != null || ift != null || altura != null || peso != null;
-
-    if (hasEvalFisica && upserted) {
-      const evalData: Record<string, unknown> = {
-        jugador_id: upserted.id,
-        fecha: new Date().toISOString().slice(0, 10),
-        salto,
-        velocidad_30m: vel30m,
-        ift,
-        altura,
-        peso,
-        imc,
-        grasa_corporal: gc,
-      };
-
-      await supabase
-        .from("eval_fisicas")
-        .upsert(evalData, { onConflict: "jugador_id,fecha" })
-        .select("id");
+    if (salto != null || vel30m != null || ift != null || altura != null || peso != null) {
+      evalFisicaBatch.push({
+        jugador_id: jugadorId,
+        fecha: today,
+        salto, velocidad_30m: vel30m, ift, altura, peso, imc, grasa_corporal: gc,
+      });
     }
+  }
 
-    // Sync evaluaciones (cols BH2=63..., actually BL=63, BM=64, BN=65, BO=66 based on the header)
-    // Headers show: TECNICA-TACTICA (col 63), FISICA (64), ACTITUDINAL (65), PROMEDIO (66)
+  for (let i = 0; i < evalFisicaBatch.length; i += BATCH_SIZE) {
+    const chunk = evalFisicaBatch.slice(i, i + BATCH_SIZE);
+    const { error } = await supabase
+      .from("eval_fisicas")
+      .upsert(chunk, { onConflict: "jugador_id,fecha" });
+    if (error) errors.push(`Batch eval_fisicas ${i}: ${error.message}`);
+  }
+
+  // --- Phase 4: Batch upsert evaluaciones ---
+  const semestre = new Date().getMonth() < 6 ? 1 : 2;
+  const anio = new Date().getFullYear();
+  const evalBatch: Record<string, unknown>[] = [];
+
+  for (const [rut, jugadorId] of upsertedMap) {
+    const rowIdx = rutToRowIdx.get(rut);
+    if (rowIdx == null) continue;
+    const row = rows[rowIdx];
+
     const notaTec = parseNum(row[63] || "");
     const notaFis = parseNum(row[64] || "");
     const notaAct = parseNum(row[65] || "");
     const promedio = parseNum(row[66] || "");
 
-    const hasEval = notaTec != null || notaFis != null || notaAct != null;
-
-    if (hasEval && upserted) {
-      const evalTecData: Record<string, unknown> = {
-        jugador_id: upserted.id,
-        semestre: new Date().getMonth() < 6 ? 1 : 2,
-        anio: new Date().getFullYear(),
-        nota_tecnica: notaTec,
-        nota_fisica: notaFis,
-        nota_actitudinal: notaAct,
-        promedio,
-      };
-
-      await supabase
-        .from("evaluaciones")
-        .upsert(evalTecData, { onConflict: "jugador_id,semestre,anio" })
-        .select("id");
+    if (notaTec != null || notaFis != null || notaAct != null) {
+      evalBatch.push({
+        jugador_id: jugadorId, semestre, anio,
+        nota_tecnica: notaTec, nota_fisica: notaFis, nota_actitudinal: notaAct, promedio,
+      });
     }
+  }
 
-    updated++;
+  for (let i = 0; i < evalBatch.length; i += BATCH_SIZE) {
+    const chunk = evalBatch.slice(i, i + BATCH_SIZE);
+    const { error } = await supabase
+      .from("evaluaciones")
+      .upsert(chunk, { onConflict: "jugador_id,semestre,anio" });
+    if (error) errors.push(`Batch evaluaciones ${i}: ${error.message}`);
   }
 
   return NextResponse.json({
     ok: true,
     total_filas: rows.length,
-    actualizados: updated,
+    actualizados: upsertedMap.size,
     omitidos: skipped,
     errores: errors.length,
     detalle_errores: errors.slice(0, 50),
+    eval_fisicas: evalFisicaBatch.length,
+    evaluaciones: evalBatch.length,
     timestamp: new Date().toISOString(),
   });
 }
