@@ -258,7 +258,13 @@ export async function POST() {
     const notaTec = clampNota(parseNum(row[63] || ""));
     const notaFis = clampNota(parseNum(row[64] || ""));
     const notaAct = clampNota(parseNum(row[65] || ""));
-    const promedio = clampNota(parseNum(row[66] || ""));
+    let promedio = clampNota(parseNum(row[66] || ""));
+    if (promedio == null) {
+      const vals = [notaTec, notaFis, notaAct].filter((v): v is number => v != null);
+      if (vals.length > 0) {
+        promedio = Math.round((vals.reduce((s, x) => s + x, 0) / vals.length) * 10) / 10;
+      }
+    }
 
     if (notaTec != null || notaFis != null || notaAct != null) {
       evalBatch.push({

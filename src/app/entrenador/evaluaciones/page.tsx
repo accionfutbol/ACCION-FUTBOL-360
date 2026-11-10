@@ -205,14 +205,19 @@ export default function EvaluacionesPage() {
       const ids = jugadores.map((j) => j.id);
       const { data } = await supabase
         .from("evaluaciones")
-        .select("jugador_id, promedio")
+        .select("jugador_id, nota_tecnica, nota_fisica, nota_actitudinal, promedio")
         .in("jugador_id", ids)
         .eq("semestre", semestre)
         .eq("anio", anio);
 
       const map: Record<string, number | null> = {};
-      (data ?? []).forEach((e) => {
-        map[e.jugador_id] = e.promedio;
+      (data ?? []).forEach((e: any) => {
+        let p = e.promedio;
+        if (p == null) {
+          const vals = [e.nota_tecnica, e.nota_fisica, e.nota_actitudinal].filter((v: any) => v != null);
+          if (vals.length > 0) p = Math.round((vals.reduce((s: number, x: number) => s + x, 0) / vals.length) * 10) / 10;
+        }
+        map[e.jugador_id] = p;
       });
       setPromedios(map);
     }
