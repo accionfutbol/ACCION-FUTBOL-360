@@ -34,6 +34,13 @@ function parseNum(raw: string): number | null {
   return isNaN(n) ? null : n;
 }
 
+function clampNota(val: number | null): number | null {
+  if (val == null) return null;
+  if (val < 1) return null;
+  if (val > 7) return 7;
+  return Math.round(val * 10) / 10;
+}
+
 function normalizeEstado(raw: string): string {
   const upper = (raw || "").toUpperCase().trim();
   if (VALID_ESTADOS.includes(upper)) return upper;
@@ -181,10 +188,17 @@ export async function POST() {
     rutToRowIdx.set(jugadorRut, i);
   }
 
+  // Deduplicate by rut (keep last occurrence)
+  const dedupMap = new Map<string, Record<string, unknown>>();
+  for (const rec of jugadorBatch) {
+    dedupMap.set(rec.rut as string, rec);
+  }
+  const dedupBatch = Array.from(dedupMap.values());
+
   // Batch upsert jugadores in chunks
   const upsertedMap = new Map<string, string>(); // rut -> id
-  for (let i = 0; i < jugadorBatch.length; i += BATCH_SIZE) {
-    const chunk = jugadorBatch.slice(i, i + BATCH_SIZE);
+  for (let i = 0; i < dedupBatch.length; i += BATCH_SIZE) {
+    const chunk = dedupBatch.slice(i, i + BATCH_SIZE);
     const { data, error } = await supabase
       .from("jugadores")
       .upsert(chunk, { onConflict: "rut" })
@@ -241,10 +255,10 @@ export async function POST() {
     if (rowIdx == null) continue;
     const row = rows[rowIdx];
 
-    const notaTec = parseNum(row[63] || "");
-    const notaFis = parseNum(row[64] || "");
-    const notaAct = parseNum(row[65] || "");
-    const promedio = parseNum(row[66] || "");
+    const notaTec = clampNota(parseNum(row[63] || ""));
+    const notaFis = clampNota(parseNum(row[64] || ""));
+    const notaAct = clampNota(parseNum(row[65] || ""));
+    const promedio = clampNota(parseNum(row[66] || ""));
 
     if (notaTec != null || notaFis != null || notaAct != null) {
       evalBatch.push({
@@ -265,8 +279,10 @@ export async function POST() {
   return NextResponse.json({
     ok: true,
     total_filas: rows.length,
+    jugadores_unicos: dedupBatch.length,
     actualizados: upsertedMap.size,
     omitidos: skipped,
+    duplicados: jugadorBatch.length - dedupBatch.length,
     errores: errors.length,
     detalle_errores: errors.slice(0, 50),
     eval_fisicas: evalFisicaBatch.length,
