@@ -131,7 +131,7 @@ export default function MorosidadPage() {
             className="pl-8"
           />
         </div>
-        <Select value={sedeFilter} onValueChange={(v) => { setSedeFilter(v === "all" ? "" : v); setCatFilter(""); }}>
+        <Select value={sedeFilter || "all"} onValueChange={(v: string | null) => { setSedeFilter(!v || v === "all" ? "" : v); setCatFilter(""); }}>
           <SelectTrigger className="w-44">
             <SelectValue placeholder="Todas las sedes" />
           </SelectTrigger>
@@ -140,7 +140,7 @@ export default function MorosidadPage() {
             {sedes.map((s) => <SelectItem key={s.id} value={s.nombre}>{s.nombre}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Select value={catFilter} onValueChange={(v) => setCatFilter(v === "all" ? "" : v)}>
+        <Select value={catFilter || "all"} onValueChange={(v: string | null) => setCatFilter(!v || v === "all" ? "" : v)}>
           <SelectTrigger className="w-44">
             <SelectValue placeholder="Todas las categorías" />
           </SelectTrigger>
