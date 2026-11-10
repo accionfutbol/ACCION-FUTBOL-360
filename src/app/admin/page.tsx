@@ -139,8 +139,8 @@ export default function AdminDashboard() {
 
   async function load() {
       const [jugRes, morosRes, partRes, inscRes, entRes, catRes, sedesRes, mensRes, asistRes] = await Promise.all([
-        supabase.from("jugadores").select("id, estado, sede_id, pago_mensual", { count: "exact", head: false }),
-        supabase.from("mensualidades").select("id", { count: "exact", head: true }).eq("estado", "ATRASADO"),
+        supabase.from("jugadores").select("id, estado, sede_id, pago_mensual, numero_morosidad", { count: "exact", head: false }),
+        supabase.from("jugadores").select("id", { count: "exact", head: true }).gt("numero_morosidad", 0).in("estado", ["ACTIVO", "FULL", "NEW", "BECADO"]),
         supabase.from("partidos").select("id", { count: "exact", head: true })
           .gte("fecha", new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10)),
         supabase.from("inscripciones").select("id, nombre_jugador, nombre_apoderado, estado, created_at")

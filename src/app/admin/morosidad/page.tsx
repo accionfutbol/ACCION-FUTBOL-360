@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -25,19 +26,23 @@ import {
   DollarSign,
   Phone,
   TrendingDown,
+  Search,
+  Users,
 } from "lucide-react";
 
 interface MorosoRow {
-  jugador_id: string;
+  id: string;
   nombre: string;
   rut: string;
   sede_nombre: string;
   categoria_nombre: string;
-  meses_atrasados: number;
-  total_deuda: number;
+  numero_morosidad: number;
+  pago_mensual: string | null;
   telefono_apoderado: string | null;
   nombre_apoderado: string | null;
-  meses_detalle: string[];
+  telefono_jugador: string | null;
+  estado: string;
+  estado_mes: string | null;
 }
 
 export default function MorosidadPage() {
@@ -45,99 +50,109 @@ export default function MorosidadPage() {
   const [morosos, setMorosos] = useState<MorosoRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [sedeFilter, setSedeFilter] = useState("");
+  const [catFilter, setCatFilter] = useState("");
+  const [search, setSearch] = useState("");
   const [sedes, setSedes] = useState<{ id: string; nombre: string }[]>([]);
+  const [categorias, setCategorias] = useState<{ id: string; nombre: string; sede_id: string }[]>([]);
 
   useEffect(() => {
     async function load() {
-      const [sedRes, msgsRes, jugsRes] = await Promise.all([
+      setLoading(true);
+      const [{ data: sed }, { data: cats }, { data: jugs }] = await Promise.all([
         supabase.from("sedes").select("id, nombre").eq("activa", true).order("nombre"),
-        supabase.from("mensualidades")
-          .select("jugador_id, mes, monto, estado")
-          .in("estado", ["PENDIENTE", "ATRASADO"]),
-        supabase.from("jugadores")
-          .select("id, nombre, rut, sede_id, categoria_id, telefono_apoderado, nombre_apoderado")
-          .in("estado", ["ACTIVO", "FULL", "NEW"]),
-      ]) as { data: any[] | null; error: any }[];
+        supabase.from("categorias").select("id, nombre, sede_id").eq("activa", true).order("nombre"),
+        supabase
+          .from("jugadores")
+          .select("id, nombre, rut, sede_id, categoria_id, numero_morosidad, pago_mensual, telefono_apoderado, nombre_apoderado, telefono_jugador, estado, estado_mes, sedes(nombre), categorias(nombre)")
+          .gt("numero_morosidad", 0)
+          .in("estado", ["ACTIVO", "FULL", "NEW", "BECADO"])
+          .order("numero_morosidad", { ascending: false }),
+      ]);
 
-      const sed = sedRes.data ?? [];
-      const msgs = msgsRes.data ?? [];
-      const jugs = jugsRes.data ?? [];
+      setSedes((sed ?? []) as { id: string; nombre: string }[]);
+      setCategorias((cats ?? []) as { id: string; nombre: string; sede_id: string }[]);
 
-      setSedes(sed as { id: string; nombre: string }[]);
+      const rows: MorosoRow[] = (jugs ?? []).map((j: any) => ({
+        id: j.id,
+        nombre: j.nombre,
+        rut: j.rut ?? "",
+        sede_nombre: j.sedes?.nombre ?? "",
+        categoria_nombre: j.categorias?.nombre ?? "",
+        numero_morosidad: j.numero_morosidad ?? 0,
+        pago_mensual: j.pago_mensual,
+        telefono_apoderado: j.telefono_apoderado,
+        nombre_apoderado: j.nombre_apoderado,
+        telefono_jugador: j.telefono_jugador,
+        estado: j.estado,
+        estado_mes: j.estado_mes,
+      }));
 
-      const { data: cats } = await supabase
-        .from("categorias")
-        .select("id, nombre");
-
-      const sedeMap = new Map(sed.map((s: any) => [s.id, s.nombre]));
-      const catMap = new Map((cats ?? []).map((c: any) => [c.id, c.nombre]));
-      const jugMap = new Map(jugs.map((j: any) => [j.id, j]));
-
-      const deudaPorJugador = new Map<string, { meses: string[]; total: number }>();
-
-      msgs.forEach((m: any) => {
-        if (!jugMap.has(m.jugador_id)) return;
-        if (!deudaPorJugador.has(m.jugador_id)) {
-          deudaPorJugador.set(m.jugador_id, { meses: [], total: 0 });
-        }
-        const entry = deudaPorJugador.get(m.jugador_id)!;
-        entry.meses.push(m.mes);
-        entry.total += (m.monto ?? 0);
-      });
-
-      const result: MorosoRow[] = [];
-      deudaPorJugador.forEach((deuda, jugId) => {
-        const jug = jugMap.get(jugId);
-        if (!jug) return;
-        if (sedeFilter && jug.sede_id !== sedeFilter) return;
-
-        result.push({
-          jugador_id: jugId,
-          nombre: jug.nombre,
-          rut: jug.rut ?? "",
-          sede_nombre: sedeMap.get(jug.sede_id) ?? "",
-          categoria_nombre: catMap.get(jug.categoria_id) ?? "",
-          meses_atrasados: deuda.meses.length,
-          total_deuda: deuda.total,
-          telefono_apoderado: jug.telefono_apoderado,
-          nombre_apoderado: jug.nombre_apoderado,
-          meses_detalle: deuda.meses.sort(),
-        });
-      });
-
-      result.sort((a, b) => b.meses_atrasados - a.meses_atrasados);
-      setMorosos(result);
+      setMorosos(rows);
       setLoading(false);
     }
     load();
-  }, [supabase, sedeFilter]);
+  }, [supabase]);
 
-  const totalMorosos = morosos.length;
-  const totalDeuda = morosos.reduce((s, m) => s + m.total_deuda, 0);
+  const catsForFilter = categorias.filter(
+    (c) => !sedeFilter || sedes.find((s) => s.nombre === sedeFilter)?.id === c.sede_id
+  );
+
+  const filtered = morosos.filter((m) => {
+    const matchSede = !sedeFilter || m.sede_nombre === sedeFilter;
+    const matchCat = !catFilter || m.categoria_nombre === catFilter;
+    const matchSearch =
+      !search ||
+      m.nombre.toLowerCase().includes(search.toLowerCase()) ||
+      m.rut.toLowerCase().includes(search.toLowerCase());
+    return matchSede && matchCat && matchSearch;
+  });
+
+  const totalMorosos = filtered.length;
+  const con3Plus = filtered.filter((m) => m.numero_morosidad >= 3).length;
+  const con1 = filtered.filter((m) => m.numero_morosidad === 1).length;
+  const con2 = filtered.filter((m) => m.numero_morosidad === 2).length;
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">Morosidad</h1>
         <Badge variant="outline" className="text-xs">
-          <AlertCircle className="mr-1 h-3 w-3" /> Pagos pendientes
+          <AlertCircle className="mr-1 h-3 w-3" /> Datos sincronizados desde Data Fútbol
         </Badge>
       </div>
 
-      <div className="flex gap-3">
-        <Select value={sedeFilter} onValueChange={(v: string | null) => setSedeFilter(v ?? "")}>
+      <div className="flex flex-wrap gap-3">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por nombre o RUT..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-8"
+          />
+        </div>
+        <Select value={sedeFilter} onValueChange={(v) => { setSedeFilter(v === "all" ? "" : v); setCatFilter(""); }}>
           <SelectTrigger className="w-44">
-            <SelectValue placeholder="Todas las sedes">{sedeFilter ? sedes.find((s) => s.id === sedeFilter)?.nombre : "Todas las sedes"}</SelectValue>
+            <SelectValue placeholder="Todas las sedes" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Todas las sedes</SelectItem>
-            {sedes.map((s) => <SelectItem key={s.id} value={s.id}>{s.nombre}</SelectItem>)}
+            <SelectItem value="all">Todas las sedes</SelectItem>
+            {sedes.map((s) => <SelectItem key={s.id} value={s.nombre}>{s.nombre}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={catFilter} onValueChange={(v) => setCatFilter(v === "all" ? "" : v)}>
+          <SelectTrigger className="w-44">
+            <SelectValue placeholder="Todas las categorías" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas las categorías</SelectItem>
+            {catsForFilter.map((c) => <SelectItem key={c.id} value={c.nombre}>{c.nombre}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
 
-      {!loading && morosos.length > 0 && (
-        <div className="grid gap-3 sm:grid-cols-3">
+      {!loading && totalMorosos > 0 && (
+        <div className="grid gap-3 sm:grid-cols-4">
           <Card>
             <CardContent className="flex items-center gap-3 p-4">
               <TrendingDown className="h-5 w-5 text-red-400" />
@@ -149,23 +164,28 @@ export default function MorosidadPage() {
           </Card>
           <Card>
             <CardContent className="flex items-center gap-3 p-4">
-              <DollarSign className="h-5 w-5 text-yellow-400" />
+              <AlertCircle className="h-5 w-5 text-red-500" />
               <div>
-                <p className="text-2xl font-bold text-yellow-400">
-                  ${totalDeuda.toLocaleString("es-CL")}
-                </p>
-                <p className="text-xs text-muted-foreground">Deuda total</p>
+                <p className="text-2xl font-bold text-red-500">{con3Plus}</p>
+                <p className="text-xs text-muted-foreground">Con 3+ meses</p>
               </div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="flex items-center gap-3 p-4">
-              <AlertCircle className="h-5 w-5 text-orange-400" />
+              <DollarSign className="h-5 w-5 text-orange-400" />
               <div>
-                <p className="text-2xl font-bold text-orange-400">
-                  {morosos.filter((m) => m.meses_atrasados >= 3).length}
-                </p>
-                <p className="text-xs text-muted-foreground">Con 3+ meses</p>
+                <p className="text-2xl font-bold text-orange-400">{con2}</p>
+                <p className="text-xs text-muted-foreground">Con 2 meses</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="flex items-center gap-3 p-4">
+              <Users className="h-5 w-5 text-yellow-400" />
+              <div>
+                <p className="text-2xl font-bold text-yellow-400">{con1}</p>
+                <p className="text-xs text-muted-foreground">Con 1 mes</p>
               </div>
             </CardContent>
           </Card>
@@ -176,7 +196,7 @@ export default function MorosidadPage() {
         <div className="flex justify-center py-8">
           <Loader2 className="h-6 w-6 animate-spin text-primary" />
         </div>
-      ) : morosos.length === 0 ? (
+      ) : totalMorosos === 0 ? (
         <div className="flex flex-col items-center gap-2 py-12 text-muted-foreground">
           <DollarSign className="h-8 w-8 text-emerald-400" />
           <p className="text-emerald-400 font-medium">Sin morosos</p>
@@ -185,7 +205,7 @@ export default function MorosidadPage() {
       ) : (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Detalle de morosidad</CardTitle>
+            <CardTitle className="text-sm">Detalle de morosidad ({totalMorosos} jugadores)</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -193,16 +213,15 @@ export default function MorosidadPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Jugador</TableHead>
-                    <TableHead>Sede</TableHead>
-                    <TableHead className="text-center">Meses</TableHead>
-                    <TableHead className="text-right">Deuda</TableHead>
-                    <TableHead>Meses detalle</TableHead>
-                    <TableHead>Contacto</TableHead>
+                    <TableHead>Sede / Categoría</TableHead>
+                    <TableHead className="text-center">Meses moroso</TableHead>
+                    <TableHead>Estado pago</TableHead>
+                    <TableHead>Contacto apoderado</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {morosos.map((m) => (
-                    <TableRow key={m.jugador_id}>
+                  {filtered.map((m) => (
+                    <TableRow key={m.id}>
                       <TableCell>
                         <div>
                           <p className="text-sm font-medium">{m.nombre}</p>
@@ -216,34 +235,45 @@ export default function MorosidadPage() {
                       </TableCell>
                       <TableCell className="text-center">
                         <Badge className={
-                          m.meses_atrasados >= 3
-                            ? "bg-red-500/20 text-red-400"
-                            : m.meses_atrasados >= 2
-                            ? "bg-orange-500/20 text-orange-400"
-                            : "bg-yellow-500/20 text-yellow-400"
+                          m.numero_morosidad >= 3
+                            ? "bg-red-500/20 text-red-400 border-red-500/30"
+                            : m.numero_morosidad >= 2
+                            ? "bg-orange-500/20 text-orange-400 border-orange-500/30"
+                            : "bg-yellow-500/20 text-yellow-400 border-yellow-500/30"
                         }>
-                          {m.meses_atrasados}
+                          {m.numero_morosidad} {m.numero_morosidad === 1 ? "mes" : "meses"}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right text-sm font-medium">
-                        ${m.total_deuda.toLocaleString("es-CL")}
-                      </TableCell>
-                      <TableCell className="text-[10px] text-muted-foreground max-w-[120px] truncate">
-                        {m.meses_detalle.join(", ")}
+                      <TableCell>
+                        <span className="text-xs">{m.pago_mensual ?? "—"}</span>
                       </TableCell>
                       <TableCell>
-                        {m.telefono_apoderado ? (
-                          <a
-                            href={`https://wa.me/56${m.telefono_apoderado.replace(/\D/g, "").replace(/^56/, "")}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1 text-xs text-emerald-400 hover:underline"
-                          >
-                            <Phone className="h-3 w-3" /> WhatsApp
-                          </a>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
+                        <div className="space-y-1">
+                          {m.nombre_apoderado && (
+                            <p className="text-xs text-muted-foreground">{m.nombre_apoderado}</p>
+                          )}
+                          {m.telefono_apoderado ? (
+                            <a
+                              href={`https://wa.me/56${m.telefono_apoderado.replace(/\D/g, "").replace(/^56/, "")}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 text-xs text-emerald-400 hover:underline"
+                            >
+                              <Phone className="h-3 w-3" /> {m.telefono_apoderado}
+                            </a>
+                          ) : m.telefono_jugador ? (
+                            <a
+                              href={`https://wa.me/56${m.telefono_jugador.replace(/\D/g, "").replace(/^56/, "")}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 text-xs text-emerald-400 hover:underline"
+                            >
+                              <Phone className="h-3 w-3" /> {m.telefono_jugador}
+                            </a>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">Sin contacto</span>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
