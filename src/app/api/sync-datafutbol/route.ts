@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
 const SPREADSHEET_ID = "196dXsAPdaJIQEnBV5ieI51kaGfWzhCxHCZJULN6np7M";
+const UNIFORMES_SPREADSHEET_ID = "1flSxbuqmOg_EUcjTbUAO-HWHcRHD5zoE_YvwE9m2yhw";
 const SHEET_RANGE = "Base!A4:BL1800";
 const BATCH_SIZE = 200;
 
@@ -277,51 +278,69 @@ export async function POST() {
     if (error) errors.push(`Batch evaluaciones ${i}: ${error.message}`);
   }
 
-  // --- Phase 5: Sync uniformes from spreadsheet columns ---
-  const UNIFORM_COLS: { col: number; tipo: string }[] = [
-    { col: 40, tipo: "POLERON" },
-    { col: 41, tipo: "NEGRO" },
-    { col: 42, tipo: "ROSADO" },
-  ];
+  // --- Phase 5: Sync uniformes from CONSOLIDADO spreadsheet ---
+  let uniformeCount = 0;
+  const { error: uniTableCheck } = await supabase.from("uniformes").select("id").limit(1);
+  const uniformeTableExists = !uniTableCheck?.message?.includes("Could not find");
 
-  const { data: existingUnis } = await supabase
-    .from("uniformes")
-    .select("jugador_id, tipo")
-    .limit(10000);
+  if (uniformeTableExists) {
+    const uniUrl = `https://sheets.googleapis.com/v4/spreadsheets/${UNIFORMES_SPREADSHEET_ID}/values/${encodeURIComponent("CONSOLIDADO!B2:M1000")}?key=${apiKey}`;
+    const uniRes = await fetch(uniUrl);
+    const uniData = uniRes.ok ? await uniRes.json() : { values: [] };
+    const uniRows: string[][] = uniData.values || [];
 
-  const existingSet = new Set<string>();
-  (existingUnis ?? []).forEach((u: any) => {
-    existingSet.add(`${u.jugador_id}||${u.tipo}`);
-  });
+    const { data: existingUnis } = await supabase
+      .from("uniformes")
+      .select("jugador_id, tipo")
+      .limit(10000);
 
-  const uniformeBatch: Record<string, unknown>[] = [];
-  for (const [rut, jugadorId] of upsertedMap) {
-    const rowIdx = rutToRowIdx.get(rut);
-    if (rowIdx == null) continue;
-    const row = rows[rowIdx];
+    const existingSet = new Set<string>();
+    (existingUnis ?? []).forEach((u: any) => {
+      existingSet.add(`${u.jugador_id}||${u.tipo}`);
+    });
 
-    for (const uc of UNIFORM_COLS) {
-      const val = (row[uc.col] || "").trim().toUpperCase();
-      if (val && val !== "NO" && val !== "N/A" && val !== "#N/A" && val !== "-") {
-        const key = `${jugadorId}||${uc.tipo}`;
-        if (!existingSet.has(key)) {
-          uniformeBatch.push({
-            jugador_id: jugadorId,
-            tipo: uc.tipo,
-            talla: val === "SI" || val === "SÍ" || val === "OK" ? null : val,
-            entregado: true,
-            fecha_entrega: today,
-          });
-          existingSet.add(key);
+    // CONSOLIDADO cols (offset from B): 0=RUT, 7=TALLA, 9=POLERONES, 10=NEGRO, 11=ROSADO
+    const UNI_COLS: { col: number; tipo: string }[] = [
+      { col: 9, tipo: "POLERON" },
+      { col: 10, tipo: "NEGRO" },
+      { col: 11, tipo: "ROSADO" },
+    ];
+
+    const uniformeBatch: Record<string, unknown>[] = [];
+    for (const uniRow of uniRows) {
+      const rut = (uniRow[0] || "").trim();
+      if (!rut) continue;
+      const jugadorId = upsertedMap.get(rut);
+      if (!jugadorId) continue;
+
+      const talla = (uniRow[7] || "").trim() || null;
+
+      for (const uc of UNI_COLS) {
+        const val = (uniRow[uc.col] || "").trim().toUpperCase();
+        if (val === "OK") {
+          const key = `${jugadorId}||${uc.tipo}`;
+          if (!existingSet.has(key)) {
+            uniformeBatch.push({
+              jugador_id: jugadorId,
+              tipo: uc.tipo,
+              talla,
+              entregado: true,
+              fecha_entrega: today,
+            });
+            existingSet.add(key);
+          }
         }
       }
     }
-  }
 
-  for (let i = 0; i < uniformeBatch.length; i += BATCH_SIZE) {
-    const chunk = uniformeBatch.slice(i, i + BATCH_SIZE);
-    const { error } = await supabase.from("uniformes").insert(chunk);
-    if (error) errors.push(`Batch uniformes ${i}: ${error.message}`);
+    for (let i = 0; i < uniformeBatch.length; i += BATCH_SIZE) {
+      const chunk = uniformeBatch.slice(i, i + BATCH_SIZE);
+      const { error } = await supabase.from("uniformes").insert(chunk);
+      if (error) errors.push(`Batch uniformes ${i}: ${error.message}`);
+    }
+    uniformeCount = uniformeBatch.length;
+  } else {
+    errors.push("Tabla 'uniformes' no existe — omitiendo sync de uniformes");
   }
 
   return NextResponse.json({
@@ -335,7 +354,8 @@ export async function POST() {
     detalle_errores: errors.slice(0, 50),
     eval_fisicas: evalFisicaBatch.length,
     evaluaciones: evalBatch.length,
-    uniformes: uniformeBatch.length,
+    uniformes: uniformeCount,
+    uniformes_tabla_existe: uniformeTableExists,
     timestamp: new Date().toISOString(),
   });
 }
