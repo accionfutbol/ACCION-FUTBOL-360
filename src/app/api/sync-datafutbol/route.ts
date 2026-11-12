@@ -101,12 +101,6 @@ export async function POST() {
   const catMap = new Map<string, string>();
   (categorias ?? []).forEach((c: any) => catMap.set(catKey(c.sede_id, c.nombre), c.id));
 
-  const { data: defaultCat } = await supabase
-    .from("categorias")
-    .select("id")
-    .limit(1)
-    .single();
-
   // --- Phase 1: Create missing categories (few, so individual calls are fine) ---
   const missingCats = new Set<string>();
   for (const row of rows) {
@@ -114,8 +108,9 @@ export async function POST() {
     const sedeName = SEDE_MAP[sedeRaw] || sedeRaw;
     const sedeId = sedeByName.get(sedeName);
     if (!sedeId) continue;
-    const catRaw = (row[11] || "").trim();
-    if (catRaw && catRaw !== "N/A" && catRaw !== "#N/A" && !catMap.get(catKey(sedeId, catRaw))) {
+    let catRaw = (row[11] || "").trim();
+    if (!catRaw || catRaw === "N/A" || catRaw === "#N/A") catRaw = "SIN CATEGORÍA";
+    if (!catMap.get(catKey(sedeId, catRaw))) {
       missingCats.add(`${sedeId}||${catRaw}`);
     }
   }
@@ -149,9 +144,9 @@ export async function POST() {
     const sedeId = sedeByName.get(sedeName);
     if (!sedeId) { skipped++; continue; }
 
-    const catRaw = (row[11] || "").trim();
-    let categoriaId = catMap.get(catKey(sedeId, catRaw));
-    if (!categoriaId) categoriaId = defaultCat?.id;
+    let catRaw = (row[11] || "").trim();
+    if (!catRaw || catRaw === "N/A" || catRaw === "#N/A") catRaw = "SIN CATEGORÍA";
+    const categoriaId = catMap.get(catKey(sedeId, catRaw));
     if (!categoriaId) { skipped++; continue; }
 
     const jugadorRut = rut || `SIN-RUT-${nombre.replace(/\s+/g, "-").substring(0, 30)}`;
