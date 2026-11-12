@@ -3,10 +3,10 @@
 -- ============================================
 
 INSERT INTO sedes (nombre, direccion) VALUES
-  ('PEÑALOLEN', 'Peñalolén, Santiago'),
+  ('PEÑALOLÉN', 'Peñalolén, Santiago'),
   ('LAS CONDES', 'Las Condes, Santiago'),
   ('LA FLORIDA', 'La Florida, Santiago'),
-  ('MAIPU', 'Maipú, Santiago');
+  ('MAIPÚ', 'Maipú, Santiago');
 
 -- Categorías para cada sede (las principales)
 DO $$
@@ -26,21 +26,21 @@ END $$;
 
 -- Categorías especiales (sin sede fija, usan la primera sede como referencia)
 INSERT INTO categorias (sede_id, nombre, tipo)
-SELECT id, 'SENIOR AM', 'RECREATIVO' FROM sedes WHERE nombre = 'PEÑALOLEN'
+SELECT id, 'SENIOR AM', 'RECREATIVO' FROM sedes WHERE nombre = 'PEÑALOLÉN'
 ON CONFLICT DO NOTHING;
 
 INSERT INTO categorias (sede_id, nombre, tipo)
-SELECT id, 'SENIOR PM', 'RECREATIVO' FROM sedes WHERE nombre = 'PEÑALOLEN'
+SELECT id, 'SENIOR PM', 'RECREATIVO' FROM sedes WHERE nombre = 'PEÑALOLÉN'
 ON CONFLICT DO NOTHING;
 
 INSERT INTO categorias (sede_id, nombre, tipo)
-SELECT id, 'PROYECCION', 'COMPETITIVO' FROM sedes WHERE nombre = 'PEÑALOLEN'
+SELECT id, 'PROYECCION', 'COMPETITIVO' FROM sedes WHERE nombre = 'PEÑALOLÉN'
 ON CONFLICT DO NOTHING;
 
 INSERT INTO categorias (sede_id, nombre, tipo)
-SELECT id, 'PRO ELITE', 'COMPETITIVO' FROM sedes WHERE nombre = 'PEÑALOLEN'
+SELECT id, 'PRO ELITE', 'COMPETITIVO' FROM sedes WHERE nombre = 'PEÑALOLÉN'
 ON CONFLICT DO NOTHING;
 
 INSERT INTO categorias (sede_id, nombre, tipo)
-SELECT id, 'FEMENINO', 'COMPETITIVO' FROM sedes WHERE nombre = 'PEÑALOLEN'
+SELECT id, 'FEMENINO', 'COMPETITIVO' FROM sedes WHERE nombre = 'PEÑALOLÉN'
 ON CONFLICT DO NOTHING;

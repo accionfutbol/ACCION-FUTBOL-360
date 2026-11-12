@@ -277,6 +277,57 @@ export async function POST() {
     if (error) errors.push(`Batch evaluaciones ${i}: ${error.message}`);
   }
 
+  // --- Phase 5: Sync uniformes from spreadsheet columns ---
+  const UNIFORM_COLS: { col: number; tipo: string }[] = [
+    { col: 40, tipo: "POLERON" },
+    { col: 41, tipo: "NEGRO" },
+    { col: 42, tipo: "ROSADO" },
+  ];
+
+  const allJugadorIds = Array.from(upsertedMap.values());
+  const { data: existingUnis } = await supabase
+    .from("uniformes")
+    .select("jugador_id, tipo")
+    .in("jugador_id", allJugadorIds.slice(0, 1000));
+  const { data: existingUnis2 } = allJugadorIds.length > 1000
+    ? await supabase.from("uniformes").select("jugador_id, tipo").in("jugador_id", allJugadorIds.slice(1000))
+    : { data: [] };
+
+  const existingSet = new Set<string>();
+  [...(existingUnis ?? []), ...(existingUnis2 ?? [])].forEach((u: any) => {
+    existingSet.add(`${u.jugador_id}||${u.tipo}`);
+  });
+
+  const uniformeBatch: Record<string, unknown>[] = [];
+  for (const [rut, jugadorId] of upsertedMap) {
+    const rowIdx = rutToRowIdx.get(rut);
+    if (rowIdx == null) continue;
+    const row = rows[rowIdx];
+
+    for (const uc of UNIFORM_COLS) {
+      const val = (row[uc.col] || "").trim().toUpperCase();
+      if (val && val !== "NO" && val !== "N/A" && val !== "#N/A" && val !== "-") {
+        const key = `${jugadorId}||${uc.tipo}`;
+        if (!existingSet.has(key)) {
+          uniformeBatch.push({
+            jugador_id: jugadorId,
+            tipo: uc.tipo,
+            talla: val === "SI" || val === "SÍ" || val === "OK" ? null : val,
+            entregado: true,
+            fecha_entrega: today,
+          });
+          existingSet.add(key);
+        }
+      }
+    }
+  }
+
+  for (let i = 0; i < uniformeBatch.length; i += BATCH_SIZE) {
+    const chunk = uniformeBatch.slice(i, i + BATCH_SIZE);
+    const { error } = await supabase.from("uniformes").insert(chunk);
+    if (error) errors.push(`Batch uniformes ${i}: ${error.message}`);
+  }
+
   return NextResponse.json({
     ok: true,
     total_filas: rows.length,
@@ -288,6 +339,7 @@ export async function POST() {
     detalle_errores: errors.slice(0, 50),
     eval_fisicas: evalFisicaBatch.length,
     evaluaciones: evalBatch.length,
+    uniformes: uniformeBatch.length,
     timestamp: new Date().toISOString(),
   });
 }
