@@ -133,8 +133,10 @@ const adminNav: NavItem[] = [
     label: "Entrenamiento",
     icon: ClipboardList,
     children: [
+      { href: "/entrenador/planificador", label: "Planificador", icon: CalendarDays },
       { href: "/entrenador/dashboard", label: "Dashboard", icon: LayoutDashboard },
       { href: "/entrenador/asistencia", label: "Asistencia", icon: ClipboardList },
+      { href: "/entrenador/reporte-entrenamiento", label: "Reporte DT", icon: FileText },
       { href: "/entrenador/reporte", label: "Reportes", icon: BarChart3 },
     ],
   },

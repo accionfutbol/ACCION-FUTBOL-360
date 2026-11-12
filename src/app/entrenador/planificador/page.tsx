@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import {
   Loader2,
   Save,
@@ -21,6 +22,12 @@ import {
   Check,
   Calendar,
   CalendarDays,
+  Plus,
+  Trash2,
+  Clock,
+  Target,
+  Users,
+  MapPin,
 } from "lucide-react";
 
 interface Sede { id: string; nombre: string }
@@ -32,6 +39,23 @@ interface Planificacion {
   fecha: string;
   contenido: string;
   tipo: string;
+  titulo?: string;
+  objetivo?: string;
+  observaciones?: string;
+  materiales?: string;
+  espacio_cancha?: string;
+  cantidad_jugadores?: string;
+  horario?: string;
+  sede_nombre?: string;
+}
+
+interface Ejercicio {
+  id?: string;
+  nombre: string;
+  descripcion: string;
+  duracion_min: number | null;
+  materiales: string;
+  espacio_cancha: string;
 }
 
 const DIAS_HEADER = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
@@ -52,6 +76,14 @@ const MESES = [
 ];
 
 const TIPOS = ["ENTRENAMIENTO", "TORNEO", "AMISTOSO", "PRUEBA", "OTRO"];
+
+const RANGOS_JUGADORES = [
+  { value: "10-20", label: "10 a 20 jugadores" },
+  { value: "20-30", label: "20 a 30 jugadores" },
+  { value: "30-40", label: "30 a 40 jugadores" },
+  { value: "40-50", label: "40 a 50 jugadores" },
+  { value: "50-60", label: "50 a 60 jugadores" },
+];
 
 const tipoBg: Record<string, string> = {
   ENTRENAMIENTO: "bg-primary/15 border-primary/30",
@@ -87,6 +119,16 @@ export default function PlanificadorPage() {
   const [editDate, setEditDate] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
   const [editTipo, setEditTipo] = useState("ENTRENAMIENTO");
+  const [editTitulo, setEditTitulo] = useState("");
+  const [editObjetivo, setEditObjetivo] = useState("");
+  const [editObservaciones, setEditObservaciones] = useState("");
+  const [editMateriales, setEditMateriales] = useState("");
+  const [editEspacio, setEditEspacio] = useState("");
+  const [editCantJugadores, setEditCantJugadores] = useState("");
+  const [editHorario, setEditHorario] = useState("");
+  const [editSedeNombre, setEditSedeNombre] = useState("");
+  const [ejercicios, setEjercicios] = useState<Ejercicio[]>([]);
+  const [loadingEjercicios, setLoadingEjercicios] = useState(false);
   const [showConfig, setShowConfig] = useState(false);
 
   useEffect(() => {
@@ -113,7 +155,7 @@ export default function PlanificadorPage() {
 
     const [{ data: dias }, { data: plan }] = await Promise.all([
       supabase.from("dias_entrenamiento").select("dia_semana").eq("sede_id", sedeId).eq("categoria_id", categoriaId),
-      supabase.from("planificacion").select("*").eq("sede_id", sedeId).eq("categoria_id", categoriaId).gte("fecha", desde).lte("fecha", hasta),
+      supabase.from("planificacion").select("id, sede_id, categoria_id, fecha, contenido, tipo, titulo, objetivo, observaciones, materiales, espacio_cancha, cantidad_jugadores, horario, sede_nombre").eq("sede_id", sedeId).eq("categoria_id", categoriaId).gte("fecha", desde).lte("fecha", hasta),
     ]);
 
     if (dias && dias.length > 0) {
@@ -170,26 +212,105 @@ export default function PlanificadorPage() {
     setSemanaOffset(0);
   }
 
-  function openEdit(date: Date) {
+  async function openEdit(date: Date) {
     const key = toDateStr(date);
     const existing = planMap[key];
     setEditDate(key);
     setEditContent(existing?.contenido ?? "");
     setEditTipo(existing?.tipo ?? (date.getDay() === 6 ? "TORNEO" : "ENTRENAMIENTO"));
+    setEditTitulo(existing?.titulo ?? "");
+    setEditObjetivo(existing?.objetivo ?? "");
+    setEditObservaciones(existing?.observaciones ?? "");
+    setEditMateriales(existing?.materiales ?? "");
+    setEditEspacio(existing?.espacio_cancha ?? "");
+    setEditCantJugadores(existing?.cantidad_jugadores ?? "");
+    setEditHorario(existing?.horario ?? "");
+    setEditSedeNombre(existing?.sede_nombre ?? sedeNombre);
+    setEjercicios([]);
+
+    if (existing?.id) {
+      setLoadingEjercicios(true);
+      const { data } = await supabase
+        .from("planificacion_ejercicios")
+        .select("id, nombre, descripcion, duracion_min, materiales, espacio_cancha")
+        .eq("planificacion_id", existing.id)
+        .order("orden");
+      setEjercicios((data ?? []).map((e: any) => ({
+        id: e.id,
+        nombre: e.nombre ?? "",
+        descripcion: e.descripcion ?? "",
+        duracion_min: e.duracion_min,
+        materiales: e.materiales ?? "",
+        espacio_cancha: e.espacio_cancha ?? "",
+      })));
+      setLoadingEjercicios(false);
+    }
   }
 
   async function saveEdit() {
     if (!editDate || !sedeId || !categoriaId) return;
     setSaving(true);
     const existing = planMap[editDate];
-    if (existing?.id) {
-      await supabase.from("planificacion").update({ contenido: editContent, tipo: editTipo, updated_at: new Date().toISOString() }).eq("id", existing.id);
+    const planData = {
+      sede_id: sedeId,
+      categoria_id: categoriaId,
+      fecha: editDate,
+      contenido: editContent,
+      tipo: editTipo,
+      titulo: editTitulo || null,
+      objetivo: editObjetivo || null,
+      observaciones: editObservaciones || null,
+      materiales: editMateriales || null,
+      espacio_cancha: editEspacio || null,
+      cantidad_jugadores: editCantJugadores || null,
+      horario: editHorario || null,
+      sede_nombre: editSedeNombre || null,
+      updated_at: new Date().toISOString(),
+    };
+
+    let planId = existing?.id;
+    if (planId) {
+      await supabase.from("planificacion").update(planData).eq("id", planId);
     } else {
-      await supabase.from("planificacion").upsert({ sede_id: sedeId, categoria_id: categoriaId, fecha: editDate, contenido: editContent, tipo: editTipo }, { onConflict: "sede_id,categoria_id,fecha" });
+      const { data } = await supabase
+        .from("planificacion")
+        .upsert(planData, { onConflict: "sede_id,categoria_id,fecha" })
+        .select("id")
+        .single();
+      planId = data?.id;
     }
+
+    if (planId && ejercicios.length > 0) {
+      await supabase.from("planificacion_ejercicios").delete().eq("planificacion_id", planId);
+      const rows = ejercicios.map((e, i) => ({
+        planificacion_id: planId,
+        orden: i,
+        nombre: e.nombre,
+        descripcion: e.descripcion || null,
+        duracion_min: e.duracion_min,
+        materiales: e.materiales || null,
+        espacio_cancha: e.espacio_cancha || null,
+      }));
+      await supabase.from("planificacion_ejercicios").insert(rows);
+    } else if (planId && ejercicios.length === 0) {
+      await supabase.from("planificacion_ejercicios").delete().eq("planificacion_id", planId);
+    }
+
     await loadPlan();
     setEditDate(null);
     setSaving(false);
+  }
+
+  function addEjercicio() {
+    setEjercicios((prev) => [...prev, { nombre: "", descripcion: "", duracion_min: null, materiales: "", espacio_cancha: "" }]);
+  }
+
+  function updateEjercicio(idx: number, field: keyof Ejercicio, value: any) {
+    setEjercicios((prev) => prev.map((e, i) => i === idx ? { ...e, [field]: value } : e));
+  }
+
+  function removeEjercicio(idx: number) {
+    setEjercicios((prev) => prev.filter((_, i) => i !== idx));
   }
 
   async function saveConfig() {
@@ -360,9 +481,9 @@ export default function PlanificadorPage() {
                         )}
                       </div>
                       {/* Contenido */}
-                      {isTraining && plan?.contenido ? (
+                      {isTraining && (plan?.titulo || plan?.contenido) ? (
                         <p className="mt-0.5 line-clamp-3 text-[10px] leading-tight md:text-xs md:leading-snug">
-                          {plan.contenido}
+                          {plan.titulo ? <span className="font-semibold">{plan.titulo}</span> : plan.contenido}
                         </p>
                       ) : isTraining ? (
                         <p className="mt-0.5 text-[10px] italic text-muted-foreground md:text-xs">+</p>
@@ -376,7 +497,7 @@ export default function PlanificadorPage() {
 
           {/* ═══ VISTA SEMANA ═══ */}
           {vista === "semana" && (
-            <div className="space-y-0 overflow-hidden rounded-lg border border-border bg-card">
+            <div className="space-y-0 rounded-lg border border-border bg-card">
               {weekDates.map((date, i) => {
                 const key = toDateStr(date);
                 const plan = planMap[key];
@@ -391,18 +512,24 @@ export default function PlanificadorPage() {
                     key={key}
                     onClick={() => isTraining ? openEdit(date) : undefined}
                     disabled={!isTraining}
-                    className={`flex w-full items-start gap-3 border-b border-border p-3 text-left transition-colors last:border-b-0 md:p-4 ${
-                      isTraining ? "cursor-pointer hover:bg-muted/40 active:scale-[0.995]" : "cursor-default opacity-30"
+                    className={`flex w-full items-center gap-3 border-b border-border text-left transition-colors last:border-b-0 ${
+                      isTraining ? "cursor-pointer p-3 hover:bg-muted/40 active:scale-[0.995] md:p-4 items-start" : "cursor-default opacity-30 px-3 py-1.5"
                     } ${today ? "bg-primary/5" : ""} ${!inMonth ? "opacity-50" : ""}`}
                   >
                     {/* Fecha columna */}
-                    <div className="flex w-14 shrink-0 flex-col items-center">
+                    <div className={`flex shrink-0 flex-col items-center ${isTraining ? "w-14" : "w-14"}`}>
                       <span className="text-[10px] font-medium uppercase text-muted-foreground">
                         {DIAS_FULL[date.getDay()].slice(0, 3)}
                       </span>
-                      <span className={`mt-0.5 flex h-9 w-9 items-center justify-center rounded-full text-lg font-bold ${today ? "bg-primary text-primary-foreground" : ""}`}>
-                        {date.getDate()}
-                      </span>
+                      {isTraining ? (
+                        <span className={`mt-0.5 flex h-9 w-9 items-center justify-center rounded-full text-lg font-bold ${today ? "bg-primary text-primary-foreground" : ""}`}>
+                          {date.getDate()}
+                        </span>
+                      ) : (
+                        <span className={`text-sm font-semibold ${today ? "text-primary" : "text-muted-foreground"}`}>
+                          {date.getDate()}
+                        </span>
+                      )}
                     </div>
 
                     {/* Contenido */}
@@ -412,12 +539,16 @@ export default function PlanificadorPage() {
                           {tipo}
                         </span>
                       )}
-                      {isTraining && plan?.contenido ? (
-                        <p className="whitespace-pre-wrap text-sm leading-relaxed">{plan.contenido}</p>
+                      {isTraining && (plan?.titulo || plan?.contenido) ? (
+                        <div>
+                          {plan.titulo && <p className="text-sm font-semibold">{plan.titulo}</p>}
+                          {plan.objetivo && <p className="text-xs text-muted-foreground">{plan.objetivo}</p>}
+                          {!plan.titulo && plan.contenido && <p className="whitespace-pre-wrap text-sm leading-relaxed">{plan.contenido}</p>}
+                        </div>
                       ) : isTraining ? (
                         <p className="text-sm italic text-muted-foreground">Sin planificación — toca para agregar</p>
                       ) : (
-                        <p className="text-sm text-muted-foreground">Sin entrenamiento</p>
+                        <p className="text-xs text-muted-foreground">—</p>
                       )}
                     </div>
                   </button>
@@ -439,28 +570,186 @@ export default function PlanificadorPage() {
       {editDate && (
         <>
           <div className="fixed inset-0 z-40 bg-black/40" onClick={() => setEditDate(null)} />
-          <div className="fixed inset-x-4 top-1/2 z-50 -translate-y-1/2 rounded-xl border border-border bg-card p-5 shadow-xl md:inset-x-auto md:left-1/2 md:w-full md:max-w-lg md:-translate-x-1/2">
-            <div className="mb-4 flex items-center justify-between">
+          <div className="fixed inset-x-2 inset-y-4 z-50 flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-xl md:inset-x-auto md:inset-y-8 md:left-1/2 md:w-full md:max-w-2xl md:-translate-x-1/2">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-border px-5 py-4">
               <h3 className="text-lg font-bold text-primary">{formatDateLong(editDate)}</h3>
               <button onClick={() => setEditDate(null)} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
             </div>
-            <div className="mb-3">
-              <label className="mb-1 block text-xs font-medium text-muted-foreground">Tipo de actividad</label>
-              <Select value={editTipo} onValueChange={(v: string | null) => setEditTipo(v ?? "ENTRENAMIENTO")}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{TIPOS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
-              </Select>
+
+            {/* Scrollable body */}
+            <div className="flex-1 space-y-4 overflow-y-auto p-5">
+              {/* Fila: Tipo + Título */}
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-muted-foreground">Tipo de actividad</label>
+                  <Select value={editTipo} onValueChange={(v: string | null) => setEditTipo(v ?? "ENTRENAMIENTO")}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{TIPOS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-muted-foreground">Título</label>
+                  <Input value={editTitulo} onChange={(e) => setEditTitulo(e.target.value)} placeholder="Ej: Técnica de pase y recepción" />
+                </div>
+              </div>
+
+              {/* Objetivo */}
+              <div>
+                <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                  <Target className="h-3.5 w-3.5" /> Objetivo de la sesión
+                </label>
+                <Textarea value={editObjetivo} onChange={(e) => setEditObjetivo(e.target.value)} placeholder="Ej: Mejorar la precisión en el pase corto y la recepción orientada" rows={2} />
+              </div>
+
+              {/* Materiales y Espacio */}
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-muted-foreground">Materiales generales</label>
+                  <Input value={editMateriales} onChange={(e) => setEditMateriales(e.target.value)} placeholder="Ej: Conos, petos, balones" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-muted-foreground">Espacio de cancha</label>
+                  <Input value={editEspacio} onChange={(e) => setEditEspacio(e.target.value)} placeholder="Ej: Media cancha, área chica" />
+                </div>
+              </div>
+
+              {/* Cantidad de jugadores, Horario, Sede */}
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div>
+                  <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                    <Users className="h-3.5 w-3.5" /> Jugadores en cancha
+                  </label>
+                  <Select value={editCantJugadores} onValueChange={(v: string | null) => setEditCantJugadores(v ?? "")}>
+                    <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                    <SelectContent>
+                      {RANGOS_JUGADORES.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                    <Clock className="h-3.5 w-3.5" /> Horario
+                  </label>
+                  <Input value={editHorario} onChange={(e) => setEditHorario(e.target.value)} placeholder="Ej: 18:00 - 19:30" />
+                </div>
+                <div>
+                  <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                    <MapPin className="h-3.5 w-3.5" /> Sede / Lugar
+                  </label>
+                  <Input value={editSedeNombre} onChange={(e) => setEditSedeNombre(e.target.value)} placeholder="Ej: Cancha Las Condes" />
+                </div>
+              </div>
+
+              {/* ── Ejercicios ── */}
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <label className="text-sm font-semibold text-foreground">Ejercicios</label>
+                  <Button variant="outline" size="sm" onClick={addEjercicio} className="gap-1.5 text-xs">
+                    <Plus className="h-3.5 w-3.5" /> Agregar
+                  </Button>
+                </div>
+
+                {loadingEjercicios && (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                  </div>
+                )}
+
+                {ejercicios.length === 0 && !loadingEjercicios && (
+                  <p className="rounded-lg border border-dashed border-border py-6 text-center text-sm text-muted-foreground">
+                    Sin ejercicios — agrega uno con el botón de arriba
+                  </p>
+                )}
+
+                <div className="space-y-3">
+                  {ejercicios.map((ej, idx) => (
+                    <div key={idx} className="rounded-lg border border-border bg-muted/30 p-3">
+                      <div className="mb-2 flex items-center gap-2">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary">
+                          {idx + 1}
+                        </span>
+                        <Input
+                          value={ej.nombre}
+                          onChange={(e) => updateEjercicio(idx, "nombre", e.target.value)}
+                          placeholder="Nombre del ejercicio"
+                          className="flex-1 font-medium"
+                        />
+                        <button onClick={() => removeEjercicio(idx)} className="shrink-0 text-muted-foreground hover:text-red-500">
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <div className="mb-2">
+                        <Textarea
+                          value={ej.descripcion}
+                          onChange={(e) => updateEjercicio(idx, "descripcion", e.target.value)}
+                          placeholder="Descripción del ejercicio, instrucciones, variantes..."
+                          rows={2}
+                          className="text-sm"
+                        />
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <label className="mb-0.5 block text-[10px] text-muted-foreground"><Clock className="mr-0.5 inline h-3 w-3" />Duración (min)</label>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={120}
+                            value={ej.duracion_min ?? ""}
+                            onChange={(e) => updateEjercicio(idx, "duracion_min", e.target.value ? parseInt(e.target.value) : null)}
+                            placeholder="15"
+                            className="text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-0.5 block text-[10px] text-muted-foreground">Materiales</label>
+                          <Input
+                            value={ej.materiales}
+                            onChange={(e) => updateEjercicio(idx, "materiales", e.target.value)}
+                            placeholder="Conos, petos"
+                            className="text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-0.5 block text-[10px] text-muted-foreground">Espacio</label>
+                          <Input
+                            value={ej.espacio_cancha}
+                            onChange={(e) => updateEjercicio(idx, "espacio_cancha", e.target.value)}
+                            placeholder="20x20m"
+                            className="text-sm"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Contenido libre (legacy + notas extra) */}
+              <div>
+                <label className="mb-1 block text-xs font-medium text-muted-foreground">Notas adicionales</label>
+                <Textarea
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  placeholder="Notas libres, recordatorios, ajustes de último minuto..."
+                  rows={3}
+                />
+              </div>
+
+              {/* Observaciones */}
+              <div>
+                <label className="mb-1 block text-xs font-medium text-muted-foreground">Observaciones</label>
+                <Textarea
+                  value={editObservaciones}
+                  onChange={(e) => setEditObservaciones(e.target.value)}
+                  placeholder="Observaciones post-entrenamiento, qué funcionó, qué mejorar..."
+                  rows={2}
+                />
+              </div>
             </div>
-            <div className="mb-4">
-              <label className="mb-1 block text-xs font-medium text-muted-foreground">Planificación</label>
-              <Textarea
-                value={editContent}
-                onChange={(e) => setEditContent(e.target.value)}
-                placeholder={editTipo === "TORNEO" ? "Ej: Torneo Liga Soccer vs Club X - Cancha 3 - 10:00" : "Ej: Calentamiento 15min\nRondo 4v2\nPosesión 6v6\nPartido reducido\nElongación"}
-                rows={6}
-              />
-            </div>
-            <div className="flex gap-3">
+
+            {/* Footer */}
+            <div className="flex gap-3 border-t border-border px-5 py-4">
               <Button variant="outline" onClick={() => setEditDate(null)} className="flex-1">Cancelar</Button>
               <Button onClick={saveEdit} disabled={saving} className="flex-1 gap-2">
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Guardar
