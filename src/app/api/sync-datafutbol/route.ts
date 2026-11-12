@@ -284,17 +284,13 @@ export async function POST() {
     { col: 42, tipo: "ROSADO" },
   ];
 
-  const allJugadorIds = Array.from(upsertedMap.values());
   const { data: existingUnis } = await supabase
     .from("uniformes")
     .select("jugador_id, tipo")
-    .in("jugador_id", allJugadorIds.slice(0, 1000));
-  const { data: existingUnis2 } = allJugadorIds.length > 1000
-    ? await supabase.from("uniformes").select("jugador_id, tipo").in("jugador_id", allJugadorIds.slice(1000))
-    : { data: [] };
+    .limit(10000);
 
   const existingSet = new Set<string>();
-  [...(existingUnis ?? []), ...(existingUnis2 ?? [])].forEach((u: any) => {
+  (existingUnis ?? []).forEach((u: any) => {
     existingSet.add(`${u.jugador_id}||${u.tipo}`);
   });
 
