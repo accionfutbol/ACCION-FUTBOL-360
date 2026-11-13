@@ -31,6 +31,7 @@ import {
   BookOpen,
   Search,
   ImagePlus,
+  Download,
 } from "lucide-react";
 
 interface Sede { id: string; nombre: string }
@@ -418,6 +419,237 @@ export default function PlanificadorPage() {
     setConfigDays((prev) => prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]);
   }
 
+  async function exportPDF() {
+    if (!editDate) return;
+    const { default: jsPDF } = await import("jspdf");
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const pw = doc.internal.pageSize.getWidth();
+    const margin = 15;
+    const contentW = pw - margin * 2;
+    let y = 15;
+
+    // Logo
+    try {
+      const logoImg = new Image();
+      logoImg.crossOrigin = "anonymous";
+      await new Promise<void>((resolve, reject) => {
+        logoImg.onload = () => resolve();
+        logoImg.onerror = () => reject();
+        logoImg.src = "/logo-af.jpg";
+      });
+      const canvas = document.createElement("canvas");
+      canvas.width = logoImg.naturalWidth;
+      canvas.height = logoImg.naturalHeight;
+      canvas.getContext("2d")!.drawImage(logoImg, 0, 0);
+      const logoData = canvas.toDataURL("image/jpeg");
+      const logoW = 25;
+      const logoH = (logoImg.naturalHeight / logoImg.naturalWidth) * logoW;
+      doc.addImage(logoData, "JPEG", pw / 2 - logoW / 2, y, logoW, logoH);
+      y += logoH + 4;
+    } catch { y += 5; }
+
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("ACCIÓN FÚTBOL", pw / 2, y, { align: "center" });
+    y += 7;
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "normal");
+    doc.text("Planificación de Entrenamiento", pw / 2, y, { align: "center" });
+    y += 10;
+
+    // Línea magenta
+    doc.setDrawColor(255, 46, 147);
+    doc.setLineWidth(0.8);
+    doc.line(margin, y, pw - margin, y);
+    y += 8;
+
+    // Info general
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    const infoLeft = [
+      ["Fecha:", formatDateLong(editDate)],
+      ["Sede:", editSedeNombre || sedeNombre],
+      ["Categoría:", catNombre],
+    ];
+    const infoRight = [
+      ["Tipo:", editTipo],
+      ["Horario:", editHorario || "—"],
+      ["Jugadores:", editCantJugadores || "—"],
+    ];
+    for (let i = 0; i < infoLeft.length; i++) {
+      doc.setFont("helvetica", "bold");
+      doc.text(infoLeft[i][0], margin, y);
+      doc.setFont("helvetica", "normal");
+      doc.text(infoLeft[i][1], margin + 25, y);
+      doc.setFont("helvetica", "bold");
+      doc.text(infoRight[i][0], pw / 2 + 5, y);
+      doc.setFont("helvetica", "normal");
+      doc.text(infoRight[i][1], pw / 2 + 30, y);
+      y += 6;
+    }
+    y += 4;
+
+    // Título
+    if (editTitulo) {
+      doc.setFontSize(13);
+      doc.setFont("helvetica", "bold");
+      doc.text(editTitulo, pw / 2, y, { align: "center" });
+      y += 8;
+    }
+
+    // Objetivo
+    if (editObjetivo) {
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.text("Objetivo:", margin, y);
+      doc.setFont("helvetica", "normal");
+      const lines = doc.splitTextToSize(editObjetivo, contentW - 22);
+      doc.text(lines, margin + 22, y);
+      y += lines.length * 5 + 4;
+    }
+
+    // Materiales / Espacio
+    if (editMateriales || editEspacio) {
+      doc.setFontSize(10);
+      if (editMateriales) {
+        doc.setFont("helvetica", "bold");
+        doc.text("Materiales:", margin, y);
+        doc.setFont("helvetica", "normal");
+        doc.text(editMateriales, margin + 27, y);
+      }
+      if (editEspacio) {
+        doc.setFont("helvetica", "bold");
+        doc.text("Espacio:", pw / 2 + 5, y);
+        doc.setFont("helvetica", "normal");
+        doc.text(editEspacio, pw / 2 + 25, y);
+      }
+      y += 8;
+    }
+
+    // Ejercicios
+    if (ejercicios.length > 0) {
+      doc.setDrawColor(255, 46, 147);
+      doc.setLineWidth(0.5);
+      doc.line(margin, y, pw - margin, y);
+      y += 6;
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.text("Ejercicios", margin, y);
+      y += 7;
+
+      for (let i = 0; i < ejercicios.length; i++) {
+        const ej = ejercicios[i];
+        if (y > 260) { doc.addPage(); y = 15; }
+
+        doc.setFontSize(11);
+        doc.setFont("helvetica", "bold");
+        doc.text(`${i + 1}. ${ej.nombre}`, margin, y);
+        y += 6;
+
+        if (ej.descripcion) {
+          doc.setFontSize(9);
+          doc.setFont("helvetica", "normal");
+          const descLines = doc.splitTextToSize(ej.descripcion, contentW - 5);
+          for (const line of descLines) {
+            if (y > 275) { doc.addPage(); y = 15; }
+            doc.text(line, margin + 5, y);
+            y += 4.5;
+          }
+          y += 2;
+        }
+
+        // Imagen del ejercicio
+        if (ej.imagen_url && !ej._file) {
+          try {
+            const imgEl = new Image();
+            imgEl.crossOrigin = "anonymous";
+            await new Promise<void>((resolve, reject) => {
+              imgEl.onload = () => resolve();
+              imgEl.onerror = () => reject();
+              imgEl.src = ej.imagen_url! + (ej.imagen_url!.includes("lh3.googleusercontent.com") ? "=w600" : "");
+            });
+            const c = document.createElement("canvas");
+            c.width = imgEl.naturalWidth;
+            c.height = imgEl.naturalHeight;
+            c.getContext("2d")!.drawImage(imgEl, 0, 0);
+            const imgData = c.toDataURL("image/jpeg");
+            const imgW = Math.min(80, contentW - 10);
+            const imgH = (imgEl.naturalHeight / imgEl.naturalWidth) * imgW;
+            if (y + imgH > 270) { doc.addPage(); y = 15; }
+            doc.addImage(imgData, "JPEG", margin + 5, y, imgW, imgH);
+            y += imgH + 5;
+          } catch { /* skip if image fails */ }
+        }
+
+        const meta = [
+          ej.duracion_min ? `${ej.duracion_min} min` : "",
+          ej.materiales || "",
+          ej.espacio_cancha || "",
+        ].filter(Boolean).join(" · ");
+        if (meta) {
+          doc.setFontSize(8);
+          doc.setTextColor(120, 120, 120);
+          doc.text(meta, margin + 5, y);
+          doc.setTextColor(0, 0, 0);
+          y += 5;
+        }
+        y += 3;
+      }
+    }
+
+    // Notas adicionales
+    if (editContent) {
+      if (y > 250) { doc.addPage(); y = 15; }
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.3);
+      doc.line(margin, y, pw - margin, y);
+      y += 6;
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.text("Notas adicionales:", margin, y);
+      y += 6;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      const notesLines = doc.splitTextToSize(editContent, contentW);
+      for (const line of notesLines) {
+        if (y > 280) { doc.addPage(); y = 15; }
+        doc.text(line, margin, y);
+        y += 4.5;
+      }
+    }
+
+    // Observaciones
+    if (editObservaciones) {
+      y += 4;
+      if (y > 250) { doc.addPage(); y = 15; }
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.text("Observaciones:", margin, y);
+      y += 6;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      const obsLines = doc.splitTextToSize(editObservaciones, contentW);
+      for (const line of obsLines) {
+        if (y > 280) { doc.addPage(); y = 15; }
+        doc.text(line, margin, y);
+        y += 4.5;
+      }
+    }
+
+    // Footer
+    const pages = doc.getNumberOfPages();
+    for (let p = 1; p <= pages; p++) {
+      doc.setPage(p);
+      doc.setFontSize(7);
+      doc.setTextColor(150, 150, 150);
+      doc.text(`Acción Fútbol — ${catNombre} — ${formatDateLong(editDate)}`, margin, doc.internal.pageSize.getHeight() - 8);
+      doc.text(`Página ${p}/${pages}`, pw - margin, doc.internal.pageSize.getHeight() - 8, { align: "right" });
+      doc.setTextColor(0, 0, 0);
+    }
+
+    doc.save(`Planificacion_${catNombre.replace(/\s/g, "_")}_${editDate}.pdf`);
+  }
+
   if (loading) {
     return <div className="flex items-center justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
@@ -548,12 +780,9 @@ export default function PlanificadorPage() {
                   return (
                     <button
                       key={key}
-                      onClick={() => isTraining ? openEdit(date) : undefined}
-                      disabled={!isTraining}
-                      className={`relative min-h-[90px] border-b border-r border-border p-1.5 text-left transition-colors md:min-h-[110px] md:p-2 ${
-                        isTraining
-                          ? "cursor-pointer hover:bg-muted/40 active:scale-[0.98]"
-                          : "cursor-default bg-muted/10 opacity-40"
+                      onClick={() => openEdit(date)}
+                      className={`relative min-h-[90px] border-b border-r border-border p-1.5 text-left transition-colors md:min-h-[110px] md:p-2 cursor-pointer hover:bg-muted/40 active:scale-[0.98] ${
+                        !isTraining ? "bg-muted/10 opacity-60" : ""
                       } ${today ? "ring-2 ring-inset ring-primary/40" : ""}`}
                     >
                       {/* Número del día */}
@@ -561,20 +790,20 @@ export default function PlanificadorPage() {
                         <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${today ? "bg-primary text-primary-foreground" : ""}`}>
                           {date.getDate()}
                         </span>
-                        {isTraining && (
+                        {(isTraining || plan) && (
                           <span className={`hidden rounded px-1 py-0.5 text-[9px] font-semibold md:inline-block ${tipoText[tipo] ?? ""}`}>
                             {tipo === "ENTRENAMIENTO" ? "ENT" : tipo === "TORNEO" ? "TOR" : tipo === "AMISTOSO" ? "AMI" : tipo.slice(0, 3)}
                           </span>
                         )}
                       </div>
                       {/* Contenido */}
-                      {isTraining && (plan?.titulo || plan?.contenido) ? (
+                      {(plan?.titulo || plan?.contenido) ? (
                         <p className="mt-0.5 line-clamp-3 text-[10px] leading-tight md:text-xs md:leading-snug">
                           {plan.titulo ? <span className="font-semibold">{plan.titulo}</span> : plan.contenido}
                         </p>
-                      ) : isTraining ? (
+                      ) : (
                         <p className="mt-0.5 text-[10px] italic text-muted-foreground md:text-xs">+</p>
-                      ) : null}
+                      )}
                     </button>
                   );
                 })}
@@ -597,10 +826,9 @@ export default function PlanificadorPage() {
                 return (
                   <button
                     key={key}
-                    onClick={() => isTraining ? openEdit(date) : undefined}
-                    disabled={!isTraining}
-                    className={`flex w-full items-center gap-3 border-b border-border text-left transition-colors last:border-b-0 ${
-                      isTraining ? "cursor-pointer p-3 hover:bg-muted/40 active:scale-[0.995] md:p-4 items-start" : "cursor-default opacity-30 px-3 py-1.5"
+                    onClick={() => openEdit(date)}
+                    className={`flex w-full items-center gap-3 border-b border-border text-left transition-colors last:border-b-0 cursor-pointer p-3 hover:bg-muted/40 active:scale-[0.995] md:p-4 items-start ${
+                      !isTraining ? "opacity-50" : ""
                     } ${today ? "bg-primary/5" : ""} ${!inMonth ? "opacity-50" : ""}`}
                   >
                     {/* Fecha columna */}
@@ -608,34 +836,26 @@ export default function PlanificadorPage() {
                       <span className="text-[10px] font-medium uppercase text-muted-foreground">
                         {DIAS_FULL[date.getDay()].slice(0, 3)}
                       </span>
-                      {isTraining ? (
-                        <span className={`mt-0.5 flex h-9 w-9 items-center justify-center rounded-full text-lg font-bold ${today ? "bg-primary text-primary-foreground" : ""}`}>
-                          {date.getDate()}
-                        </span>
-                      ) : (
-                        <span className={`text-sm font-semibold ${today ? "text-primary" : "text-muted-foreground"}`}>
-                          {date.getDate()}
-                        </span>
-                      )}
+                      <span className={`mt-0.5 flex h-9 w-9 items-center justify-center rounded-full text-lg font-bold ${today ? "bg-primary text-primary-foreground" : ""}`}>
+                        {date.getDate()}
+                      </span>
                     </div>
 
                     {/* Contenido */}
                     <div className="min-w-0 flex-1">
-                      {isTraining && (
+                      {(isTraining || plan) && (
                         <span className={`mb-1 inline-block rounded border px-1.5 py-0.5 text-[10px] font-semibold ${tipoBg[tipo] ?? ""} ${tipoText[tipo] ?? ""}`}>
                           {tipo}
                         </span>
                       )}
-                      {isTraining && (plan?.titulo || plan?.contenido) ? (
+                      {(plan?.titulo || plan?.contenido) ? (
                         <div>
                           {plan.titulo && <p className="text-sm font-semibold">{plan.titulo}</p>}
                           {plan.objetivo && <p className="text-xs text-muted-foreground">{plan.objetivo}</p>}
                           {!plan.titulo && plan.contenido && <p className="whitespace-pre-wrap text-sm leading-relaxed">{plan.contenido}</p>}
                         </div>
-                      ) : isTraining ? (
-                        <p className="text-sm italic text-muted-foreground">Sin planificación — toca para agregar</p>
                       ) : (
-                        <p className="text-xs text-muted-foreground">—</p>
+                        <p className="text-sm italic text-muted-foreground">Sin planificación — toca para agregar</p>
                       )}
                     </div>
                   </button>
@@ -950,6 +1170,9 @@ export default function PlanificadorPage() {
             {/* Footer */}
             <div className="flex gap-3 border-t border-border px-5 py-4">
               <Button variant="outline" onClick={() => setEditDate(null)} className="flex-1">Cancelar</Button>
+              <Button variant="outline" onClick={exportPDF} className="gap-2">
+                <Download className="h-4 w-4" /> PDF
+              </Button>
               <Button onClick={saveEdit} disabled={saving} className="flex-1 gap-2">
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Guardar
               </Button>
