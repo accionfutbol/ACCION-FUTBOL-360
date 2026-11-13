@@ -30,7 +30,7 @@ import {
   MapPin,
   BookOpen,
   Search,
-  ChevronDown as ChevronDownIcon,
+  ImagePlus,
 } from "lucide-react";
 
 interface Sede { id: string; nombre: string }
@@ -59,6 +59,8 @@ interface Ejercicio {
   duracion_min: number | null;
   materiales: string;
   espacio_cancha: string;
+  imagen_url?: string | null;
+  _file?: File;
 }
 
 interface BibliotecaEjercicio {
@@ -256,7 +258,7 @@ export default function PlanificadorPage() {
       setLoadingEjercicios(true);
       const { data } = await supabase
         .from("planificacion_ejercicios")
-        .select("id, nombre, descripcion, duracion_min, materiales, espacio_cancha")
+        .select("id, nombre, descripcion, duracion_min, materiales, espacio_cancha, imagen_url")
         .eq("planificacion_id", existing.id)
         .order("orden");
       setEjercicios((data ?? []).map((e: any) => ({
@@ -266,6 +268,7 @@ export default function PlanificadorPage() {
         duracion_min: e.duracion_min,
         materiales: e.materiales ?? "",
         espacio_cancha: e.espacio_cancha ?? "",
+        imagen_url: e.imagen_url ?? null,
       })));
       setLoadingEjercicios(false);
     }
@@ -305,6 +308,21 @@ export default function PlanificadorPage() {
     }
 
     if (planId && ejercicios.length > 0) {
+      const uploadedUrls: (string | null)[] = [];
+      for (const e of ejercicios) {
+        if (e._file) {
+          const ext = e._file.name.split(".").pop() ?? "jpg";
+          const path = `${planId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+          const { data: upData, error: upErr } = await supabase.storage.from("ejercicios").upload(path, e._file, { upsert: true });
+          if (upErr) { uploadedUrls.push(e.imagen_url ?? null); }
+          else {
+            const { data: urlData } = supabase.storage.from("ejercicios").getPublicUrl(upData.path);
+            uploadedUrls.push(urlData.publicUrl);
+          }
+        } else {
+          uploadedUrls.push(e.imagen_url ?? null);
+        }
+      }
       await supabase.from("planificacion_ejercicios").delete().eq("planificacion_id", planId);
       const rows = ejercicios.map((e, i) => ({
         planificacion_id: planId,
@@ -314,6 +332,7 @@ export default function PlanificadorPage() {
         duracion_min: e.duracion_min,
         materiales: e.materiales || null,
         espacio_cancha: e.espacio_cancha || null,
+        imagen_url: uploadedUrls[i] || null,
       }));
       await supabase.from("planificacion_ejercicios").insert(rows);
     } else if (planId && ejercicios.length === 0) {
@@ -326,7 +345,7 @@ export default function PlanificadorPage() {
   }
 
   function addEjercicio() {
-    setEjercicios((prev) => [...prev, { nombre: "", descripcion: "", duracion_min: null, materiales: "", espacio_cancha: "" }]);
+    setEjercicios((prev) => [...prev, { nombre: "", descripcion: "", duracion_min: null, materiales: "", espacio_cancha: "", imagen_url: null }]);
   }
 
   function updateEjercicio(idx: number, field: keyof Ejercicio, value: any) {
@@ -841,6 +860,33 @@ export default function PlanificadorPage() {
                           className="text-sm"
                         />
                       </div>
+                      {/* Imagen del ejercicio */}
+                      <div className="mb-2">
+                        {(ej.imagen_url || ej._file) ? (
+                          <div className="flex items-start gap-2">
+                            <img
+                              src={ej._file ? URL.createObjectURL(ej._file) : (ej.imagen_url ?? "")}
+                              alt={ej.nombre}
+                              className="h-20 w-28 cursor-zoom-in rounded-md border border-border object-cover"
+                              onClick={() => setPreviewImg({url: ej._file ? URL.createObjectURL(ej._file) : (ej.imagen_url ?? ""), nombre: ej.nombre})}
+                            />
+                            <div className="flex flex-col gap-1">
+                              <label className="cursor-pointer rounded border border-border px-2 py-1 text-[10px] font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground">
+                                Cambiar
+                                <input type="file" accept="image/*" className="hidden" onChange={(e) => { if (e.target.files?.[0]) updateEjercicio(idx, "_file", e.target.files[0]); }} />
+                              </label>
+                              <button onClick={() => { updateEjercicio(idx, "imagen_url", null); updateEjercicio(idx, "_file", undefined); }} className="text-[10px] text-red-400 hover:text-red-500">Quitar</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-border px-3 py-2 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground">
+                            <ImagePlus className="h-4 w-4" />
+                            <span>Subir imagen del ejercicio</span>
+                            <input type="file" accept="image/*" className="hidden" onChange={(e) => { if (e.target.files?.[0]) updateEjercicio(idx, "_file", e.target.files[0]); }} />
+                          </label>
+                        )}
+                      </div>
+
                       <div className="grid grid-cols-3 gap-2">
                         <div>
                           <label className="mb-0.5 block text-[10px] text-muted-foreground"><Clock className="mr-0.5 inline h-3 w-3" />Duración (min)</label>
