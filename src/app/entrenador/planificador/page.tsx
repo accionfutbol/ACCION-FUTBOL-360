@@ -153,6 +153,7 @@ export default function PlanificadorPage() {
   const [bibLoading, setBibLoading] = useState(false);
   const [bibCategorias, setBibCategorias] = useState<string[]>([]);
   const [bibFases, setBibFases] = useState<string[]>([]);
+  const [previewImg, setPreviewImg] = useState<{url: string; nombre: string} | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -787,8 +788,9 @@ export default function PlanificadorPage() {
                             <img
                               src={bej.imagen_url + "=w120"}
                               alt={bej.nombre}
-                              className="h-14 w-14 shrink-0 rounded-md border border-border object-cover"
+                              className="h-14 w-14 shrink-0 cursor-zoom-in rounded-md border border-border object-cover"
                               loading="lazy"
+                              onClick={(e) => { e.stopPropagation(); setPreviewImg({url: bej.imagen_url + "=w800", nombre: bej.nombre}); }}
                               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                             />
                           ) : (
@@ -906,6 +908,25 @@ export default function PlanificadorPage() {
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Guardar
               </Button>
             </div>
+          </div>
+        </>
+      )}
+
+      {/* ═══ Lightbox imagen ejercicio ═══ */}
+      {previewImg && (
+        <>
+          <div className="fixed inset-0 z-[60] bg-black/70" onClick={() => setPreviewImg(null)} />
+          <div className="fixed inset-4 z-[61] flex flex-col items-center justify-center" onClick={() => setPreviewImg(null)}>
+            <div className="mb-2 flex w-full max-w-2xl items-center justify-between px-1">
+              <p className="truncate text-sm font-semibold text-white">{previewImg.nombre}</p>
+              <button onClick={() => setPreviewImg(null)} className="text-white/70 hover:text-white"><X className="h-5 w-5" /></button>
+            </div>
+            <img
+              src={previewImg.url}
+              alt={previewImg.nombre}
+              className="max-h-[80vh] max-w-full rounded-lg border border-white/20 object-contain shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
           </div>
         </>
       )}
