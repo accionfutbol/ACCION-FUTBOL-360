@@ -70,6 +70,7 @@ interface BibliotecaEjercicio {
   momento_juego: string;
   objetivo: string;
   formato: string;
+  imagen_url: string | null;
 }
 
 const DIAS_HEADER = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
@@ -780,15 +781,29 @@ export default function PlanificadorPage() {
                         <button
                           key={bej.id}
                           onClick={() => addFromBiblioteca(bej)}
-                          className="flex w-full items-start gap-2 rounded-lg border border-border bg-card p-2 text-left transition-colors hover:border-primary/50 hover:bg-primary/5 active:scale-[0.99]"
+                          className="flex w-full items-start gap-2.5 rounded-lg border border-border bg-card p-2 text-left transition-colors hover:border-primary/50 hover:bg-primary/5 active:scale-[0.99]"
                         >
-                          <Plus className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                          {bej.imagen_url ? (
+                            <img
+                              src={bej.imagen_url + "=w120"}
+                              alt={bej.nombre}
+                              className="h-14 w-14 shrink-0 rounded-md border border-border object-cover"
+                              loading="lazy"
+                              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                            />
+                          ) : (
+                            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-md border border-border bg-muted">
+                              <BookOpen className="h-5 w-5 text-muted-foreground" />
+                            </div>
+                          )}
                           <div className="min-w-0 flex-1">
                             <p className="text-sm font-medium leading-tight">{bej.nombre}</p>
                             <p className="mt-0.5 text-[10px] text-muted-foreground">
-                              {bej.categoria} · {bej.fase_modelo} · {bej.momento_juego}
+                              {bej.categoria} · {bej.fase_modelo}
                             </p>
+                            <p className="mt-0.5 text-[10px] text-primary/70">{bej.momento_juego}</p>
                           </div>
+                          <Plus className="mt-1 h-4 w-4 shrink-0 text-primary" />
                         </button>
                       ))}
                     </div>
