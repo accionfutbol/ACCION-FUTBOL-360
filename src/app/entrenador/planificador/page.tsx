@@ -428,7 +428,15 @@ export default function PlanificadorPage() {
     const contentW = pw - margin * 2;
     let y = 15;
 
-    // Logo
+    // Banner negro con logo
+    const bannerH = 32;
+    doc.setFillColor(20, 20, 20);
+    doc.rect(0, 0, pw, bannerH, "F");
+
+    // Línea magenta inferior del banner
+    doc.setFillColor(255, 46, 147);
+    doc.rect(0, bannerH, pw, 1.5, "F");
+
     try {
       const logoImg = new Image();
       logoImg.crossOrigin = "anonymous";
@@ -442,26 +450,34 @@ export default function PlanificadorPage() {
       canvas.height = logoImg.naturalHeight;
       canvas.getContext("2d")!.drawImage(logoImg, 0, 0);
       const logoData = canvas.toDataURL("image/jpeg");
-      const logoW = 25;
-      const logoH = (logoImg.naturalHeight / logoImg.naturalWidth) * logoW;
-      doc.addImage(logoData, "JPEG", pw / 2 - logoW / 2, y, logoW, logoH);
-      y += logoH + 4;
-    } catch { y += 5; }
+      const logoH = bannerH - 6;
+      const logoW = (logoImg.naturalWidth / logoImg.naturalHeight) * logoH;
+      doc.addImage(logoData, "JPEG", margin, 3, logoW, logoH);
 
-    doc.setFontSize(16);
-    doc.setFont("helvetica", "bold");
-    doc.text("ACCIÓN FÚTBOL", pw / 2, y, { align: "center" });
-    y += 7;
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "normal");
-    doc.text("Planificación de Entrenamiento", pw / 2, y, { align: "center" });
-    y += 10;
-
-    // Línea magenta
-    doc.setDrawColor(255, 46, 147);
-    doc.setLineWidth(0.8);
-    doc.line(margin, y, pw - margin, y);
-    y += 8;
+      // Título al lado del logo
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(18);
+      doc.setFont("helvetica", "bold");
+      doc.text("ACCIÓN FÚTBOL", margin + logoW + 6, 14);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(255, 46, 147);
+      doc.text("Planificación de Entrenamiento", margin + logoW + 6, 21);
+      doc.setFontSize(8);
+      doc.setTextColor(180, 180, 180);
+      doc.text(`${catNombre}  ·  ${editSedeNombre || sedeNombre}`, margin + logoW + 6, 27);
+    } catch {
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(18);
+      doc.setFont("helvetica", "bold");
+      doc.text("ACCIÓN FÚTBOL", pw / 2, 14, { align: "center" });
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(255, 46, 147);
+      doc.text("Planificación de Entrenamiento", pw / 2, 21, { align: "center" });
+    }
+    doc.setTextColor(0, 0, 0);
+    y = bannerH + 6;
 
     // Info general
     doc.setFontSize(10);
