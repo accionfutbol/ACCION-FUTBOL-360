@@ -28,6 +28,9 @@ import {
   Target,
   Users,
   MapPin,
+  BookOpen,
+  Search,
+  ChevronDown as ChevronDownIcon,
 } from "lucide-react";
 
 interface Sede { id: string; nombre: string }
@@ -56,6 +59,17 @@ interface Ejercicio {
   duracion_min: number | null;
   materiales: string;
   espacio_cancha: string;
+}
+
+interface BibliotecaEjercicio {
+  id: number;
+  categoria: string;
+  subcategoria: string | null;
+  nombre: string;
+  fase_modelo: string;
+  momento_juego: string;
+  objetivo: string;
+  formato: string;
 }
 
 const DIAS_HEADER = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
@@ -130,6 +144,14 @@ export default function PlanificadorPage() {
   const [ejercicios, setEjercicios] = useState<Ejercicio[]>([]);
   const [loadingEjercicios, setLoadingEjercicios] = useState(false);
   const [showConfig, setShowConfig] = useState(false);
+  const [showBiblioteca, setShowBiblioteca] = useState(false);
+  const [bibSearch, setBibSearch] = useState("");
+  const [bibCategoria, setBibCategoria] = useState("");
+  const [bibFase, setBibFase] = useState("");
+  const [bibResults, setBibResults] = useState<BibliotecaEjercicio[]>([]);
+  const [bibLoading, setBibLoading] = useState(false);
+  const [bibCategorias, setBibCategorias] = useState<string[]>([]);
+  const [bibFases, setBibFases] = useState<string[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -311,6 +333,50 @@ export default function PlanificadorPage() {
 
   function removeEjercicio(idx: number) {
     setEjercicios((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  async function openBiblioteca() {
+    setShowBiblioteca(true);
+    setBibSearch("");
+    setBibCategoria("");
+    setBibFase("");
+    setBibLoading(true);
+    const [{ data: all }, { data: cats }, { data: fases }] = await Promise.all([
+      supabase.from("biblioteca_ejercicios").select("*").order("categoria").order("nombre").limit(50),
+      supabase.from("biblioteca_ejercicios").select("categoria").order("categoria"),
+      supabase.from("biblioteca_ejercicios").select("fase_modelo").order("fase_modelo"),
+    ]);
+    setBibResults(all ?? []);
+    const uniqueCats = [...new Set((cats ?? []).map((r: any) => r.categoria))].sort();
+    const uniqueFases = [...new Set((fases ?? []).map((r: any) => r.fase_modelo))].sort();
+    setBibCategorias(uniqueCats);
+    setBibFases(uniqueFases);
+    setBibLoading(false);
+  }
+
+  async function searchBiblioteca() {
+    setBibLoading(true);
+    let q = supabase.from("biblioteca_ejercicios").select("*");
+    if (bibCategoria) q = q.eq("categoria", bibCategoria);
+    if (bibFase) q = q.eq("fase_modelo", bibFase);
+    if (bibSearch.trim()) q = q.ilike("nombre", `%${bibSearch.trim()}%`);
+    q = q.order("categoria").order("nombre").limit(100);
+    const { data } = await q;
+    setBibResults(data ?? []);
+    setBibLoading(false);
+  }
+
+  function addFromBiblioteca(bej: BibliotecaEjercicio) {
+    setEjercicios((prev) => [
+      ...prev,
+      {
+        nombre: bej.nombre,
+        descripcion: `${bej.categoria}${bej.subcategoria ? " — " + bej.subcategoria : ""}\nObjetivo: ${bej.objetivo}\nMomento: ${bej.momento_juego}`,
+        duracion_min: null,
+        materiales: "",
+        espacio_cancha: "",
+      },
+    ]);
   }
 
   async function saveConfig() {
@@ -645,9 +711,14 @@ export default function PlanificadorPage() {
               <div>
                 <div className="mb-2 flex items-center justify-between">
                   <label className="text-sm font-semibold text-foreground">Ejercicios</label>
-                  <Button variant="outline" size="sm" onClick={addEjercicio} className="gap-1.5 text-xs">
-                    <Plus className="h-3.5 w-3.5" /> Agregar
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={openBiblioteca} className="gap-1.5 text-xs">
+                      <BookOpen className="h-3.5 w-3.5" /> Biblioteca
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={addEjercicio} className="gap-1.5 text-xs">
+                      <Plus className="h-3.5 w-3.5" /> Manual
+                    </Button>
+                  </div>
                 </div>
 
                 {loadingEjercicios && (
@@ -660,6 +731,71 @@ export default function PlanificadorPage() {
                   <p className="rounded-lg border border-dashed border-border py-6 text-center text-sm text-muted-foreground">
                     Sin ejercicios — agrega uno con el botón de arriba
                   </p>
+                )}
+
+                {/* ── Panel Biblioteca ── */}
+                {showBiblioteca && (
+                  <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-3">
+                    <div className="mb-3 flex items-center justify-between">
+                      <p className="text-sm font-semibold text-primary">Biblioteca de Ejercicios</p>
+                      <button onClick={() => setShowBiblioteca(false)} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+                    </div>
+                    <div className="mb-3 flex flex-col gap-2 md:flex-row">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          value={bibSearch}
+                          onChange={(e) => setBibSearch(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && searchBiblioteca()}
+                          placeholder="Buscar ejercicio..."
+                          className="pl-8 text-sm"
+                        />
+                      </div>
+                      <Select value={bibCategoria} onValueChange={(v: string | null) => setBibCategoria(v === "__all__" ? "" : (v ?? ""))}>
+                        <SelectTrigger className="w-full text-xs md:w-44"><SelectValue placeholder="Categoría" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__all__">Todas las categorías</SelectItem>
+                          {bibCategorias.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <Select value={bibFase} onValueChange={(v: string | null) => setBibFase(v === "__all__" ? "" : (v ?? ""))}>
+                        <SelectTrigger className="w-full text-xs md:w-40"><SelectValue placeholder="Fase" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__all__">Todas las fases</SelectItem>
+                          {bibFases.map((f) => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <Button size="sm" onClick={searchBiblioteca} className="gap-1 text-xs">
+                        <Search className="h-3.5 w-3.5" /> Buscar
+                      </Button>
+                    </div>
+                    <div className="max-h-60 space-y-1 overflow-y-auto">
+                      {bibLoading && (
+                        <div className="flex items-center justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
+                      )}
+                      {!bibLoading && bibResults.length === 0 && (
+                        <p className="py-4 text-center text-sm text-muted-foreground">Sin resultados</p>
+                      )}
+                      {!bibLoading && bibResults.map((bej) => (
+                        <button
+                          key={bej.id}
+                          onClick={() => addFromBiblioteca(bej)}
+                          className="flex w-full items-start gap-2 rounded-lg border border-border bg-card p-2 text-left transition-colors hover:border-primary/50 hover:bg-primary/5 active:scale-[0.99]"
+                        >
+                          <Plus className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium leading-tight">{bej.nombre}</p>
+                            <p className="mt-0.5 text-[10px] text-muted-foreground">
+                              {bej.categoria} · {bej.fase_modelo} · {bej.momento_juego}
+                            </p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                    {!bibLoading && bibResults.length > 0 && (
+                      <p className="mt-2 text-center text-[10px] text-muted-foreground">{bibResults.length} ejercicios — toca uno para agregarlo</p>
+                    )}
+                  </div>
                 )}
 
                 <div className="space-y-3">
