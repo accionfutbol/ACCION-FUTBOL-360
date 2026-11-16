@@ -126,7 +126,6 @@ const adminNav: NavItem[] = [
       { href: "/admin/sedes", label: "Sedes", icon: MapPin },
       { href: "/admin/reportes", label: "Reportes", icon: FileSpreadsheet },
       { href: "/admin/retencion", label: "Retención", icon: Activity },
-      { href: "/admin/auditoria", label: "Auditoría", icon: FileSpreadsheet },
     ],
   },
   {
