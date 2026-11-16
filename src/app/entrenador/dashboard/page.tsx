@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import {
   Loader2, Users, UserCheck, UserX, AlertTriangle, DollarSign,
   TrendingUp, MapPin, ChevronDown, ChevronUp, ClipboardList,
-  CalendarDays, Trophy, ArrowRight,
+  CalendarDays, Trophy, ArrowRight, Shield, Medal, ThumbsDown,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -62,6 +62,7 @@ export default function DashboardPage() {
   const [sedesCollapsed, setSedesCollapsed] = useState<Record<string, boolean>>({});
   const [sesionesHoy, setSesionesHoy] = useState<{ id: string; sede_nombre: string; categoria_nombre: string; horario: string }[]>([]);
   const [alertas, setAlertas] = useState<{ tipo: string; texto: string; color: string; href: string }[]>([]);
+  const [proximosPartidos, setProximosPartidos] = useState<{ id: string; fecha: string; rival: string; torneo: string; categoria_nombre: string; sede_nombre: string }[]>([]);
 
   useEffect(() => {
     async function load() {
@@ -128,6 +129,25 @@ export default function DashboardPage() {
           sede_nombre: s.sedes?.nombre ?? "",
           categoria_nombre: s.categorias?.nombre ?? "",
           horario: s.horario ?? "",
+        })));
+      }
+
+      // Próximos partidos
+      const hoyPartidos = new Date().toISOString().slice(0, 10);
+      const { data: proxPart } = await supabase
+        .from("partidos")
+        .select("id, fecha, rival, torneo, categorias(nombre), sedes(nombre)")
+        .gte("fecha", hoyPartidos)
+        .order("fecha")
+        .limit(6) as { data: any[] | null };
+      if (proxPart) {
+        setProximosPartidos(proxPart.map((p: any) => ({
+          id: p.id,
+          fecha: p.fecha,
+          rival: p.rival,
+          torneo: p.torneo ?? "",
+          categoria_nombre: p.categorias?.nombre ?? "",
+          sede_nombre: p.sedes?.nombre ?? "",
         })));
       }
 
@@ -280,6 +300,92 @@ export default function DashboardPage() {
   const pagoData = useMemo(() =>
     Object.entries(stats.byPago).map(([name, value]) => ({ name, value })),
   [stats.byPago]);
+
+  // Ranking asistencia últimos 30 días
+  const rankingAsistencia = useMemo(() => {
+    const treinta = new Date();
+    treinta.setDate(treinta.getDate() - 30);
+    const treintaStr = treinta.toISOString().slice(0, 10);
+    const reciente = asistencia.filter((a) => a.fecha >= treintaStr);
+
+    const porJugador = new Map<string, { ok: number; total: number }>();
+    for (const a of reciente) {
+      const entry = porJugador.get(a.jugador_id) ?? { ok: 0, total: 0 };
+      entry.total++;
+      if (a.marca === "OK") entry.ok++;
+      porJugador.set(a.jugador_id, entry);
+    }
+
+    const ranking = [...porJugador.entries()]
+      .filter(([, v]) => v.total >= 3)
+      .map(([id, v]) => {
+        const j = jugadores.find((j) => j.id === id);
+        return {
+          id,
+          nombre: j?.nombre ?? "—",
+          categoria: j?.categoria_nombre ?? "",
+          ok: v.ok,
+          total: v.total,
+          pct: Math.round((v.ok / v.total) * 100),
+        };
+      });
+
+    const top = [...ranking].sort((a, b) => b.pct - a.pct || b.ok - a.ok).slice(0, 5);
+    const bottom = [...ranking].sort((a, b) => a.pct - b.pct || a.ok - b.ok).slice(0, 5);
+    return { top, bottom };
+  }, [asistencia, jugadores]);
+
+  // Asistencia por categoría
+  const asistenciaPorCategoria = useMemo(() => {
+    const treinta = new Date();
+    treinta.setDate(treinta.getDate() - 30);
+    const treintaStr = treinta.toISOString().slice(0, 10);
+    const reciente = asistencia.filter((a) => a.fecha >= treintaStr);
+
+    const porCat = new Map<string, { ok: number; total: number }>();
+    for (const a of reciente) {
+      const j = jugadores.find((j) => j.id === a.jugador_id);
+      if (!j) continue;
+      const catId = j.categoria_id;
+      const entry = porCat.get(catId) ?? { ok: 0, total: 0 };
+      entry.total++;
+      if (a.marca === "OK") entry.ok++;
+      porCat.set(catId, entry);
+    }
+
+    return [...porCat.entries()]
+      .map(([catId, v]) => {
+        const cat = categorias.find((c) => c.id === catId);
+        return {
+          nombre: cat?.nombre ?? "—",
+          pct: Math.round((v.ok / v.total) * 100),
+          ok: v.ok,
+          total: v.total,
+        };
+      })
+      .sort((a, b) => b.pct - a.pct);
+  }, [asistencia, jugadores, categorias]);
+
+  // Tendencia retención (últimos 6 meses)
+  const tendenciaRetencion = useMemo(() => {
+    const mesesArr = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+    const now = new Date();
+    const data: { mes: string; ingresos: number; salidas: number; neto: number }[] = [];
+
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const mesKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const label = `${mesesArr[d.getMonth()]}`;
+
+      const ingresos = jugadores.filter((j) => j.fecha_ingreso?.startsWith(mesKey)).length;
+      const salidas = jugadores.filter((j) =>
+        j.estado === "DESACTIVADO" && j.fecha_ingreso?.startsWith(mesKey)
+      ).length;
+
+      data.push({ mes: label, ingresos, salidas, neto: ingresos - salidas });
+    }
+    return data;
+  }, [jugadores]);
 
   function toggleSede(sedeId: string) {
     setSedesCollapsed((prev) => ({ ...prev, [sedeId]: !prev[sedeId] }));
@@ -552,6 +658,139 @@ export default function DashboardPage() {
           </PieChart>
         </ResponsiveContainer>
       </ChartCard>
+
+      {/* ═══════ ASISTENCIA POR CATEGORÍA ═══════ */}
+      {asistenciaPorCategoria.length > 0 && (
+        <ChartCard title="Asistencia por Categoría (últ. 30 días)">
+          <ResponsiveContainer width="100%" height={Math.max(200, asistenciaPorCategoria.length * 36)}>
+            <BarChart data={asistenciaPorCategoria} layout="vertical" margin={{ left: 0, right: 12 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+              <XAxis type="number" domain={[0, 100]} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} tickFormatter={(v: number) => `${v}%`} />
+              <YAxis type="category" dataKey="nombre" width={110} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} />
+              <Tooltip formatter={(value: number) => `${value}%`} contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }} />
+              <Bar dataKey="pct" name="% Asistencia" radius={[0, 6, 6, 0]}>
+                {asistenciaPorCategoria.map((entry, i) => (
+                  <Cell key={i} fill={entry.pct >= 80 ? "#10b981" : entry.pct >= 60 ? "#f59e0b" : "#ef4444"} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+      )}
+
+      {/* ═══════ RANKING ASISTENCIA ═══════ */}
+      {(rankingAsistencia.top.length > 0 || rankingAsistencia.bottom.length > 0) && (
+        <div className="grid gap-4 md:grid-cols-2">
+          {/* Top 5 mejor asistencia */}
+          <ChartCard title="Top 5 — Mejor Asistencia (30 días)">
+            <div className="space-y-2">
+              {rankingAsistencia.top.map((j, i) => (
+                <div key={j.id} className="flex items-center gap-3 rounded-lg border border-border px-3 py-2">
+                  <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                    i === 0 ? "bg-yellow-500/20 text-yellow-400" : i === 1 ? "bg-zinc-400/20 text-zinc-400" : i === 2 ? "bg-orange-500/20 text-orange-400" : "bg-muted text-muted-foreground"
+                  }`}>
+                    {i + 1}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{j.nombre}</p>
+                    <p className="text-[10px] text-muted-foreground">{j.categoria}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-bold text-emerald-400">{j.pct}%</p>
+                    <p className="text-[10px] text-muted-foreground">{j.ok}/{j.total}</p>
+                  </div>
+                </div>
+              ))}
+              {rankingAsistencia.top.length === 0 && (
+                <p className="py-4 text-center text-sm text-muted-foreground">Sin datos suficientes</p>
+              )}
+            </div>
+          </ChartCard>
+
+          {/* Top 5 más faltas */}
+          <ChartCard title="Top 5 — Más Inasistencias (30 días)">
+            <div className="space-y-2">
+              {rankingAsistencia.bottom.map((j, i) => (
+                <div key={j.id} className="flex items-center gap-3 rounded-lg border border-border px-3 py-2">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-red-500/15 text-xs font-bold text-red-400">
+                    {i + 1}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{j.nombre}</p>
+                    <p className="text-[10px] text-muted-foreground">{j.categoria}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-bold text-red-400">{j.pct}%</p>
+                    <p className="text-[10px] text-muted-foreground">{j.ok}/{j.total} asist.</p>
+                  </div>
+                </div>
+              ))}
+              {rankingAsistencia.bottom.length === 0 && (
+                <p className="py-4 text-center text-sm text-muted-foreground">Sin datos suficientes</p>
+              )}
+            </div>
+          </ChartCard>
+        </div>
+      )}
+
+      {/* ═══════ TENDENCIA DE RETENCIÓN ═══════ */}
+      <ChartCard title="Tendencia de Retención (últimos 6 meses)">
+        {tendenciaRetencion.some((d) => d.ingresos > 0 || d.salidas > 0) ? (
+          <ResponsiveContainer width="100%" height={250}>
+            <BarChart data={tendenciaRetencion} margin={{ left: 0, right: 12, top: 8 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+              <XAxis dataKey="mes" tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} />
+              <YAxis tick={{ fill: "var(--muted-foreground)", fontSize: 12 }} />
+              <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Bar dataKey="ingresos" name="Ingresos" fill="#10b981" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="salidas" name="Salidas" fill="#ef4444" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        ) : (
+          <p className="py-8 text-center text-sm text-muted-foreground">Sin datos de movimiento</p>
+        )}
+      </ChartCard>
+
+      {/* ═══════ PRÓXIMOS PARTIDOS ═══════ */}
+      {proximosPartidos.length > 0 && (
+        <ChartCard title="Próximos Partidos">
+          <div className="space-y-2">
+            {proximosPartidos.map((p) => {
+              const fecha = new Date(p.fecha + "T12:00:00");
+              const diasFaltan = Math.ceil((fecha.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+              return (
+                <div key={p.id} className="flex items-center gap-3 rounded-lg border border-border px-4 py-3 transition-colors hover:bg-muted/30">
+                  <div className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-lg bg-primary/10">
+                    <span className="text-[10px] font-semibold uppercase text-primary">
+                      {fecha.toLocaleDateString("es-CL", { weekday: "short" })}
+                    </span>
+                    <span className="text-lg font-bold leading-tight text-primary">{fecha.getDate()}</span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <Shield className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      <p className="truncate text-sm font-semibold">vs {p.rival}</p>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {p.categoria_nombre} · {p.sede_nombre}
+                      {p.torneo ? ` · ${p.torneo}` : ""}
+                    </p>
+                  </div>
+                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                    diasFaltan <= 1 ? "bg-red-500/15 text-red-400" : diasFaltan <= 3 ? "bg-yellow-500/15 text-yellow-400" : "bg-muted text-muted-foreground"
+                  }`}>
+                    {diasFaltan === 0 ? "HOY" : diasFaltan === 1 ? "MAÑANA" : `${diasFaltan} días`}
+                  </span>
+                </div>
+              );
+            })}
+            <Link href="/entrenador/partidos" className="mt-2 flex items-center justify-center gap-1 text-xs text-primary hover:underline">
+              Ver todos los partidos <ArrowRight className="h-3 w-3" />
+            </Link>
+          </div>
+        </ChartCard>
+      )}
 
       {/* Top morosos */}
       {stats.morosos > 0 && (
